@@ -52,11 +52,9 @@ public abstract class GenderLayerMixin {
 	// sink that deepens with bust size); freezing it at the vanilla cap level keeps
 	// busts above 0.8 from being pushed further in
 	@Unique private static final float fp$CAP_Z_OFFSET = (1.0F - fp$VANILLA_BUST_CAP) * 0.0625F;
-	// Torso BACK clamp plane, in body space. Front = -z and back = +z (established
-	// empirically via the diagnostic panel on the 1.20.1 port). The plane sits
-	// 0.125 px outside the vanilla torso back (+2 px) so flattened geometry neither
-	// z-fights the skin nor the jacket skin layer at +2.25 px.
-	@Unique static final float fp$CLAMP_BACK_Z = 2.125F * 0.0625F;
+	// The torso-back clamp plane itself lives in BreastRenderCommandMixin (the flatten
+	// happens there); keeping a copy here would be a dead non-private @Unique field,
+	// which the mixin validator rejects at apply time
 	@Unique private static final float fp$DEG_TO_RAD = (float) (Math.PI / 180);
 
 	@Shadow protected float breastSize;
