@@ -15,7 +15,9 @@ status=0
 while IFS= read -r project; do
     [ -z "$project" ] && continue
     echo "=== building $project ==="
-    if ! (cd "$ROOT/$project" && ./gradlew.bat build --no-daemon); then
+    # < /dev/null：gradle 会消费 stdin，把 herestring 里剩余的目标行吞掉，
+    # 导致循环第二轮 read 直接 EOF（实锤踩过：只编了 forge，fabric 静默跳过）
+    if ! (cd "$ROOT/$project" && ./gradlew.bat build --no-daemon < /dev/null); then
         echo "!!! build FAILED: $project"
         status=1
     fi

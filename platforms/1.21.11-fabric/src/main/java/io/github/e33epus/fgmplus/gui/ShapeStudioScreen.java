@@ -36,6 +36,9 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 	private static final int FULL_WIDTH = 166;
 	private static final int HALF_WIDTH = FULL_WIDTH / 2 - 2;
 	private static final int PANEL_FILL = 0x55000000;
+	//FGM 5's buttons are 15px tall (its sliders stay 20px); stretching the shared
+	//skin to 20px is exactly what made our buttons look off
+	private static final int FGM_BUTTON_HEIGHT = 15;
 
 	//Cached at init and refreshed on button presses: getStatusText() stats the disk,
 	//which must not run every render frame
@@ -110,16 +113,16 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 		//files changed, so newly dropped/renamed files are picked up without restart
 		this.hurtSoundStatus = HurtSoundManager.getStatusText();
 		this.addRenderableWidget(new WildfireButton.Builder()
-				.message(() -> Component.translatable("fgmplus.studio.sound_folder"))
-				.position(left, y + 56).size(HALF_WIDTH, 20)
+					.message(() -> Component.translatable("fgmplus.studio.sound_folder"))
+					.position(left, y + 56).size(HALF_WIDTH, FGM_BUTTON_HEIGHT)
 				.onPress(button -> {
 					HurtSoundManager.openFolder();
 					this.hurtSoundStatus = HurtSoundManager.getStatusText();
 				})
 				.build());
 		this.addRenderableWidget(new WildfireButton.Builder()
-				.message(() -> Component.translatable("fgmplus.studio.preview"))
-				.position(right, y + 56).size(HALF_WIDTH, 20)
+					.message(() -> Component.translatable("fgmplus.studio.preview"))
+					.position(right, y + 56).size(HALF_WIDTH, FGM_BUTTON_HEIGHT)
 				.tooltip(Tooltip.create(Component.translatable("fgmplus.studio.preview_tip")))
 				.onPress(button -> {
 					HurtSoundManager.reloadThenPlay();
@@ -128,8 +131,8 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 				.build());
 
 		this.addRenderableWidget(new WildfireButton.Builder()
-				.message(() -> Component.translatable("fgmplus.studio.reset"))
-				.position(left, y + 76).size(HALF_WIDTH, 20)
+					.message(() -> Component.translatable("fgmplus.studio.reset"))
+					.position(left, y + 76).size(HALF_WIDTH, FGM_BUTTON_HEIGHT)
 				.onPress(button -> {
 					((ShapeHolder) resolvePlayer()).fgmplus$setShape(new ShapeData());
 					persist("reset", 0.0F);
@@ -140,8 +143,8 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 		//Diagnosis: shows the computed torso-back plane; if it hugs the back from
 		//every angle the transform chain behind the flatten clamp is proven
 		this.addRenderableWidget(new WildfireButton.Builder()
-				.message(() -> Component.translatable(ShapeRenderState.debugPlane ? "fgmplus.studio.debug_on" : "fgmplus.studio.debug_off"))
-				.position(right, y + 76).size(HALF_WIDTH, 20)
+					.message(() -> Component.translatable(ShapeRenderState.debugPlane ? "fgmplus.studio.debug_on" : "fgmplus.studio.debug_off"))
+					.position(right, y + 76).size(HALF_WIDTH, FGM_BUTTON_HEIGHT)
 				.tooltip(Tooltip.create(Component.translatable("fgmplus.studio.debug_tip")))
 				.onPress(button -> {
 					ShapeRenderState.debugPlane = !ShapeRenderState.debugPlane;
@@ -201,7 +204,9 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 		int x = this.width / 2;
 		int y = this.height / 2;
 		//Same translucent panel style as FGM's customization tabs, sized over the grid
-		graphics.fill(x - 40, y - 32, x + 136, y + 100, PANEL_FILL);
+		//(+1 on the bottom edge: fill's end is exclusive, and the wrapped status
+		//text's second line reaches y+112)
+		graphics.fill(x - 40, y - 32, x + 136, y + 113, PANEL_FILL);
 
 		//Title centered at FGM's wardrobe title height
 		graphics.drawString(this.font, this.title, x - this.font.width(this.title) / 2, y - 82, 0xFFFFFF, false);
@@ -219,9 +224,9 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 
 		int x = this.width / 2;
 		int y = this.height / 2;
-		//Status text (loaded sound files) at the bottom of the panel; can exceed the
+		//Status text (loaded sound files) below the 15px button rows; can exceed the
 		//162 px panel (long file names), so wrap to at most two lines with a tail
-		int ly = y + 78;
+		int ly = y + 94;
 		for(String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, FULL_WIDTH - 4)) {
 			graphics.drawCenteredString(this.font, line, x + 48, ly, 0xE0E0E0);
 			ly += 10;

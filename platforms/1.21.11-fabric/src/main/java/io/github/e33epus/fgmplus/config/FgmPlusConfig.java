@@ -100,7 +100,10 @@ public final class FgmPlusConfig {
 	}
 
 	// ------------------------------------------------------------------
-	// Widened bounds, looked up by FGM's persisted key names (FloatConfigKeyMixin)
+	// Widened bounds, looked up by FGM's persisted key names (FloatConfigKeyMixin
+	// for the UI/read side, NumberConfigKeyMixin for live writes). The two switches
+	// MUST stay key-for-key in lockstep: a key present in only one table treats the
+	// missing side as unbounded (NaN) and silently skips the stock check entirely.
 	// ------------------------------------------------------------------
 
 	/** Returns the widened minimum for an FGM config key, or NaN when the key is untouched. */
