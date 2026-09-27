@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.5.0
+
+**新增**
+
+- 新平台：**Fabric / Minecraft 1.21.11**，上游依赖 Female Gender Mod **5.0.0-Beta.3+1.21.11**（全部 mixin 按 FGM 5 重写：渲染钩子迁移到 `setupTransformations`/`BreastRenderCommand` 提交式管线，形状同步改为独立通道 `fgmplus:shape_sync`，滑条拓宽改为拦截 `FloatConfigKey` 的 min/max getter——FGM 5 的 `KEYS` 聚合会绕开静态字段替换，音效资源包改经 `PackRepository#reload` 注入，资源包格式 75）
+- 仓库架构对齐 e33chat / AtomChat 的「单分支多目标」：仓库根唯一 `mod_version`（本版起 Forge 与 Fabric 同号）、`versions/targets.json` 目标矩阵、`shared/` 映射中立共享层、`platforms/` 每加载器一个分支、`tools/` 守卫与构建脚本
+- 产物命名统一为 `fgmplus-<loader>-<mcversion>-<mod_version>.jar`
+
+**变更**
+
+- 旧独立布局（本仓库根即 Forge 工程）成为历史：`1.20.1Forge` 分支归档保留，`main` 分支即 monorepo
+- Forge 端无功能性改动，跟随版本号统一升至 1.5.0
+
+----
+
+**Added**
+
+- New platform: **Fabric / Minecraft 1.21.11** against Female Gender Mod **5.0.0-Beta.3+1.21.11** (all mixins rewritten for FGM 5: render hooks moved to the `setupTransformations`/`BreastRenderCommand` submit pipeline, shape sync via a standalone `fgmplus:shape_sync` payload, slider-cap widening by intercepting the `FloatConfigKey` min/max getters since FGM 5's `KEYS` aggregation bypasses static-field replacement, hurt-sound pack injected via `PackRepository#reload`, resource pack format 75)
+- Repository layout aligned with e33chat / AtomChat's "single branch, multiple targets": one repo-root `mod_version` (Forge and Fabric share the same number from this release on), `versions/targets.json` target matrix, mapping-neutral `shared/` layer, one `platforms/` branch per loader, `tools/` guard + build scripts
+- Artifact naming unified to `fgmplus-<loader>-<mcversion>-<mod_version>.jar`
+
+**Changed**
+
+- The old standalone layout (repo root = the Forge project) is history: the `1.20.1Forge` branch archives it, `main` is the monorepo
+- No functional changes on Forge in this release; version unified to 1.5.0
+
 ## v1.20.1-1.4.1
 
 **修复**

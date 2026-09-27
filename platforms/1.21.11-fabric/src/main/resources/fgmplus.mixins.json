@@ -1,0 +1,24 @@
+{
+	"required": true,
+	"package": "io.github.e33epus.fgmplus.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"minVersion": "0.8",
+	"injectors": {
+		"defaultRequire": 0
+	},
+	"mixins": [
+		"FloatConfigKeyMixin",
+		"PlayerConfigMixin",
+		"WildfireSyncServerMixin"
+	],
+	"client": [
+		"BaseWildfireScreenAccessor",
+		"BreastRenderCommandMixin",
+		"GenderLayerMixin",
+		"GenderRenderStateMixin",
+		"PackRepositoryMixin",
+		"WardrobeBrowserScreenMixin",
+		"WildfireEventHandlerMixin",
+		"WildfireSyncClientMixin"
+	]
+}

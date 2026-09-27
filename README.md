@@ -1,58 +1,33 @@
 # FGM Plus
 
-A comprehensive expansion for [Wildfire's Female Gender Mod](https://www.curseforge.com/minecraft/mc-mods/female-gender-neoforge) (Forge 1.20.1).
+Real bust scaling and per-player breast shaping for [Wildfire's Female Gender Mod](https://github.com/FemaleGenderMod/FemaleGenderMod). Based on Female Plastic Surgery by Rinko1231 (GPLv3).
 
-## Features
+**Targets** (single repo, one `mod_version` for all):
 
-### Per-player bust shaping (synced)
+| Target | Upstream | Jar |
+|---|---|---|
+| Forge 1.20.1 | FGM 3.1 (1.20.1-3.x) | `fgmplus-forge-1.20.1-<ver>.jar` |
+| Fabric 1.21.11 | FGM 5.0.0-Beta.3+1.21.11 | `fgmplus-fabric-1.21.11-<ver>.jar` |
 
-Shape data (perkiness + per-axis scaling) is stored **per player** and synced through
-FGM's own network pipeline, so everyone in the world sees your shape — just like the
-vanilla FGM sliders. Persisted to `config/fgmplus/shapes/<uuid>.json`.
+## What it does
 
-- **Perkiness** (-30° to +60°): a vertical angle that cancels or reverses FGM's hardcoded
-  35° droop, so breasts can sit higher and perkier. Bounce physics still apply on top.
-- **Per-axis scaling** (0.5–3.0 each): independent width / height / depth multipliers.
-  The above-cap real-scale growth applies to height and depth; width is controlled
-  only by the slider and stays vanilla by default.
+- **Real scale above the vanilla cap** — bust sizes past the 0.8 slider limit grow the actual breast geometry instead of only shifting its position.
+- **Shape Studio** — a per-player editor (entry button in FGM's wardrobe): three-axis scale, perkiness (counteracts FGM's droop), body-space position offsets, live preview, synced between players carrying the mod.
+- **Anti-clip back flattening** — breast vertices beyond the torso-back plane are clamped onto it per-vertex, so extreme sizes never poke through the back; jacket and armor layers follow.
+- **Widened FGM sliders** — configurable caps for bust size, offsets, bounce and floppy multipliers.
+- **Custom hurt sounds** — drop *.ogg files into `config/fgmplus/sounds/`; they replace FGM's female hurt sound with a random pick per play (preview button in the Shape Studio).
 
-### Automatic anti-clip
+## Repository layout
 
-When scaling or angle would push the model through the player's back, the excess is
-pulled back automatically (capped at 4px). The Shape Studio shows the live recovery
-percentage.
+See [ARCHITECTURE.md](ARCHITECTURE.md) (e33chat / AtomChat style: repo-root identity, `versions/targets.json` matrix, `shared/` neutral layer, per-loader `platforms/`).
 
-### Shape Studio GUI
+```
+bash tools/build_all.sh     # guard gate + build every target
+bash tools/collect_jars.sh  # collect artifacts into dist/<version>/
+```
 
-Open the wardrobe (G key) → **Shape Studio** button. Sliders for all three axes and
-perkiness, a reset button, the anti-clip indicator, and the hurt sound manager.
-Changes apply to your player and sync to everyone.
+Deployable jars land in `dist/<mod_version>/`.
 
-### Custom hurt sound
+## License
 
-FGM hardcodes its female hurt sound; many players don't like it. Drop any number of
-`.ogg` files into `config/fgmplus/sounds/` — every file plays, one picked at random
-per hurt, just like FGM's own two-damage-ogg setup (file names are free-form;
-Chinese, spaces and uppercase all work). Uses a built-in hidden resource pack; the
-**Preview** button in the Shape Studio chains a full resource reload, so newly
-added/removed/renamed files are picked up on the next preview without restarting.
-Client-side only — each player hears their own copy.
-
-## Requirements
-
-- Minecraft 1.20.1 + Forge 47+
-- [Wildfire's Female Gender Mod](https://www.curseforge.com/minecraft/mc-mods/female-gender-neoforge) 1.20.1-3.0.1 or newer (3.x)
-
-Mixed-version play is safe: clients or servers without FGM Plus simply ignore the
-extra sync bytes and see the vanilla look.
-
-## Config
-
-`fgmplus-common.toml` keeps the FGM slider limit overrides (bust size max, offset
-limits, bounce/floppy multiplier limits). The global scaling keys (`bustScaleGain`,
-`bustWidthScaleGain`, `bustScaleMax`) were retired in 1.1.0 — scaling is per-player
-shape data now.
-
-## Credits
-
-Based on **Female Plastic Surgery** by [Rinko1231](https://github.com/Rinko1231/Female-Plastic-Surgery-for-WFG) (upstream no longer maintained; this mod continues as a standalone mod). Licensed under **GPLv3**.
+GPLv3, same as the original. See LICENSE.

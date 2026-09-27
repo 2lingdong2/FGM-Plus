@@ -1,0 +1,10 @@
+{
+  "_comment": [
+    "【共享层声明】每个层一条，轴只有三个：since（MC 版本下限）/ loader / mappings。",
+    "目标挂哪几层写在 targets.json 的 layers 里；目录由声明的轴推出（layers/<轴目录按字母序+连接>/<层名>/），",
+    "层级内放 src/main/java 与 src/main/resources，由 gradle/fgmplus-layers.gradle 接进源集。",
+    "",
+    "当前为空：首个目标（1.21.11-fabric）没有可共享的层。这里故意留一个空对象而不是省掉文件 ——",
+    "挂载脚本读不到 layers.json 会直接失败，保住「挂载即声明」的形状。"
+  ]
+}
