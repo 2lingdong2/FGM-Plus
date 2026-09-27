@@ -11,7 +11,13 @@
 **变更**
 
 - 旧独立布局（本仓库根即 Forge 工程）成为历史：`1.20.1Forge` 分支归档保留，`main` 分支即 monorepo
-- Forge 端无功能性改动，跟随版本号统一升至 1.5.0
+- Forge 端唯一改动：`bustSizeMax` 默认值 1.0 → 4.0（随 Fabric 端对齐，见下）
+
+**修复**
+
+- 胸部大小滑条拓宽后**保存被静默拒绝**（拖到拓宽上限会弹回原值）：FGM 的写入校验 `NumberConfigKey#validate` 读裸字段而非 getter，拓宽只到达了显示端；现按拓宽区间在 validate 入口直接放行，滑条拓宽的「显示/读取」与「写入校验」两条路径闭环
+- `bustSizeMax` 默认值 1.0 → **4.0**：FGM 的百分比显示是 ×1.25（内部 0.8 = 表观 100%），4.0 即顶格 **500%**，与 Forge 端实际使用值一致；已有安装需把 `config/fgmplus.json` 里的 `bustSizeMax` 手动改为 4.0（新版首次生成即为 4.0）
+- 造型工作室按钮高度对齐 FGM 5 的 **15px** 标准（此前 20px 拉伸共享皮肤、与原生观感不符），音效状态文本移至按钮行下方、不再重叠
 
 ----
 
@@ -24,7 +30,13 @@
 **Changed**
 
 - The old standalone layout (repo root = the Forge project) is history: the `1.20.1Forge` branch archives it, `main` is the monorepo
-- No functional changes on Forge in this release; version unified to 1.5.0
+- Only Forge change: the `bustSizeMax` default moves 1.0 → 4.0 (aligned with the Fabric side, see below)
+
+**Fixed**
+
+- Widened breast-size values were **silently rejected on save** (the slider snapped back from the widened maximum): FGM's write validation `NumberConfigKey#validate` compares against the raw fields instead of the getters, so the widening only ever reached the display side; values inside the widened window are now accepted up front, closing both halves of the widening path (display/read + write validation)
+- The `bustSizeMax` default moves 1.0 → **4.0**: FGM's percent readout is ×1.25 (internal 0.8 = 100% apparent), so 4.0 is the full **500%**, matching the value actually used on Forge; existing installs need `bustSizeMax` set to 4.0 in `config/fgmplus.json` by hand (fresh generation now defaults to 4.0)
+- Shape Studio buttons now use FGM 5's **15px** button height (20px stretched the shared skin and looked off), and the sound-status text sits below the button rows instead of overlapping them
 
 ## v1.20.1-1.4.1
 

@@ -23,7 +23,7 @@ public final class FgmPlusConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	// Slider range widenings; each entry clamps to the same bounds the Forge spec enforced
-	public static double bustSizeMax = 1.0;        // [0.8, 4.0], FGM default bound 0.8
+	public static double bustSizeMax = 4.0;        // [0.8, 4.0]; 4.0 tops FGM's x125 percent display at 500%, matching the Forge default
 	public static double bustOffsetYMin = -1.5;    // [-4.0, -1.0], FGM default bound -1.0
 	public static double bustOffsetZMin = -1.5;    // [-4.0, -1.0], FGM default bound -1.0
 	public static double bustOffsetZMax = 0.0;     // [0.0, 4.0], FGM default bound 0.0

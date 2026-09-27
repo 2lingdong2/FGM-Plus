@@ -24,7 +24,8 @@ public class FgmPlusConfig
         ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
         BUILDER.push("FGM Plus Config");
         bustSizeMax = BUILDER
-                .defineInRange("bustSizeMax",1.0,0.8,4.0);
+                //4.0 tops FGM's x125 percent display at 500% — the mod's headline bound
+                .defineInRange("bustSizeMax",4.0,0.8,4.0);
         bustOffsetYMin = BUILDER
                 .defineInRange("Breast Height Min",-1.5,-4.0,-1.0);
         bustOffsetZMin = BUILDER
