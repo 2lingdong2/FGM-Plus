@@ -126,7 +126,7 @@ minecraft {
 mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
 
-    config "femaleplasticsurgery.mixins.json"
+    config "fgmplus.mixins.json"
     //config "${mod_id}.mixins.json"
 }
 

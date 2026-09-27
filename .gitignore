@@ -1,0 +1,10 @@
+# build artifacts and local state
+.gradle/
+build/
+run/
+logs/
+*.log
+dist/
+
+# FGM upstream source snapshots (re-clone from the release tag when needed)
+ref/
