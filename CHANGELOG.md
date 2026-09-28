@@ -4,6 +4,7 @@
 
 **新增**
 
+- **胸部圆度（Roundness）**：造型工作室新增 0–100% 圆度滑条，把 FGM 原本的 4×5×3 平直盒形（侧视"三角形"轮廓的元凶）沿径向连续变形为超椭球面——0% 即原版盒形，100% 全圆，中间值为圆角过渡；皮肤/外套/护甲/附魔光泽全部图层一起变形，物理摆动、呼吸、前倾、外扩等变换全部保留。圆度随造型数据同步、所有人可见；线格式向后兼容（新旧端混合时该项保持默认 0）
 - 新平台：**Fabric / Minecraft 1.21.11**，上游依赖 Female Gender Mod **5.0.0-Beta.3+1.21.11**（全部 mixin 按 FGM 5 重写：渲染钩子迁移到 `setupTransformations`/`BreastRenderCommand` 提交式管线，形状同步改为独立通道 `fgmplus:shape_sync`，滑条拓宽改为拦截 `FloatConfigKey` 的 min/max getter——FGM 5 的 `KEYS` 聚合会绕开静态字段替换，音效资源包改经 `PackRepository#reload` 注入，资源包格式 75）
 - 仓库架构对齐 e33chat / AtomChat 的「单分支多目标」：仓库根唯一 `mod_version`（本版起 Forge 与 Fabric 同号）、`versions/targets.json` 目标矩阵、`shared/` 映射中立共享层、`platforms/` 每加载器一个分支、`tools/` 守卫与构建脚本
 - 产物命名统一为 `fgmplus-<loader>-<mcversion>-<mod_version>.jar`
@@ -23,6 +24,7 @@
 
 **Added**
 
+- **Breast roundness**: the Shape Studio gains a 0–100% roundness slider that continuously morphs FGM's flat 4×5×3 box (the source of the "triangle" side profile) onto a superellipsoid via radial projection — 0% is the vanilla box, 100% a full sphere, values between round the edges. Every pass (skin, jacket-wear, armor, glint) deforms together, and all transforms (physics bounce, breathing, tilt, cleavage) are preserved. Roundness syncs to everyone through the shape payload; the wire format stays backward-compatible (mixed old/new ends keep it at 0)
 - New platform: **Fabric / Minecraft 1.21.11** against Female Gender Mod **5.0.0-Beta.3+1.21.11** (all mixins rewritten for FGM 5: render hooks moved to the `setupTransformations`/`BreastRenderCommand` submit pipeline, shape sync via a standalone `fgmplus:shape_sync` payload, slider-cap widening by intercepting the `FloatConfigKey` min/max getters since FGM 5's `KEYS` aggregation bypasses static-field replacement, hurt-sound pack injected via `PackRepository#reload`, resource pack format 75)
 - Repository layout aligned with e33chat / AtomChat's "single branch, multiple targets": one repo-root `mod_version` (Forge and Fabric share the same number from this release on), `versions/targets.json` target matrix, mapping-neutral `shared/` layer, one `platforms/` branch per loader, `tools/` guard + build scripts
 - Artifact naming unified to `fgmplus-<loader>-<mcversion>-<mod_version>.jar`

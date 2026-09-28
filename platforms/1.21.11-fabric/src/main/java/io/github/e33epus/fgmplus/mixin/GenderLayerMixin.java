@@ -110,10 +110,11 @@ public abstract class GenderLayerMixin {
 				view.rotateX(body.xRot);
 			}
 			Matrix4f inv = view.invert(new Matrix4f());
-			RenderCapture.beginWindow(view, inv, !((Object) this instanceof GenderArmorLayer));
+			float roundness = fp$shape != null ? fp$shape.getRoundness() : 0.0F;
+			RenderCapture.beginWindow(view, inv, !((Object) this instanceof GenderArmorLayer), roundness);
 		} catch(Exception ignored) {
 			//degenerate pose: clamp and panel fall back to vanilla rendering
-			RenderCapture.beginWindow(null, null, false);
+			RenderCapture.beginWindow(null, null, false, 0.0F);
 		}
 	}
 

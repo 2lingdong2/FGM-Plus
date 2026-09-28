@@ -101,11 +101,22 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 				value -> Component.translatable("fgmplus.studio.pos", "Y", String.format(Locale.ROOT, "%+.2f", value)),
 				value -> persist("offsetY", value)));
 
-		this.addRenderableWidget(slider(left, y + 36, FULL_WIDTH,
+		this.addRenderableWidget(slider(left, y + 36, HALF_WIDTH,
 				ShapeData.MIN_PERK, ShapeData.MAX_PERK, shape.getPerkiness(),
 				value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setPerkiness(value),
 				value -> Component.translatable("fgmplus.studio.perkiness", String.format(Locale.ROOT, "%+.0f", value)),
 				value -> persist("perkiness", value)));
+
+		//Roundness: 0 = FGM's flat box (the "triangle" silhouette), 1 = full
+		//superellipsoid; displayed as a percentage. Syncs to everyone like the
+		//rest of the shape payload
+		WildfireSlider roundness = slider(right, y + 36, HALF_WIDTH,
+				ShapeData.MIN_ROUNDNESS, ShapeData.MAX_ROUNDNESS, shape.getRoundness(),
+				value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setRoundness(value),
+				value -> Component.translatable("fgmplus.studio.roundness", String.format(Locale.ROOT, "%.0f", value * 100f)),
+				value -> persist("roundness", value));
+		roundness.setTooltip(Tooltip.create(Component.translatable("fgmplus.studio.roundness_tip")));
+		this.addRenderableWidget(roundness);
 
 		//Custom hurt sound controls; every *.ogg in the folder plays (random pick,
 		//same as FGM's own damage oggs). Preview plays instantly when the loaded

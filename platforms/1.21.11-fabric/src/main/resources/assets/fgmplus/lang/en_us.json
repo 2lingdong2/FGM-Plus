@@ -14,5 +14,7 @@
   "fgmplus.studio.debug_tip": "Green translucent panel = the computed torso-back plane; if it hugs the back, the anti-clip clamp is verified",
   "fgmplus.studio.sound_none": "No .ogg found (preview plays the vanilla sound)",
   "fgmplus.studio.sound_pending": "%d sound file(s) pending reload (click preview)",
-  "fgmplus.studio.sound_enabled": "%d sound(s) enabled: %s"
+  "fgmplus.studio.sound_enabled": "%d sound(s) enabled: %s",
+  "fgmplus.studio.roundness": "Roundness: %s%%",
+  "fgmplus.studio.roundness_tip": "0% = vanilla box shape, 100% = fully round; morphs every pass (skin, jacket, armor) onto a superellipsoid"
 }

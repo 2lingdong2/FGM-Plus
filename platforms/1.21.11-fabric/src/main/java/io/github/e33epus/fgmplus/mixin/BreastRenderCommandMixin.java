@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.wildfire.render.BreastRenderCommand;
 import com.wildfire.render.WildfireModelRenderer;
 import io.github.e33epus.fgmplus.render.RenderCapture;
+import io.github.e33epus.fgmplus.render.RoundBreastMesh;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -21,12 +22,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.function.UnaryOperator;
 
 /**
- * The back-flatten clamp ("削平背端"), ported from the 1.20.1 renderBox hook.
- * Every vertex whose body-space z lies beyond the torso-back plane is pulled
+ * The custom vertex emitter for FGM 5's breast geometry — two features in the
+ * one hook where every pass (skin, jacket-wear, armor, trim, glint) crosses:
+ * the back-flatten clamp ported from 1.20.1, and the Shape Studio roundness
+ * superellipsoid mesh ({@link RoundBreastMesh}). With roundness at 0 the
+ * flatten path is bit-identical to the original render.
+ *
+ * <p>Every vertex whose body-space z lies beyond the torso-back plane is pulled
  * straight back onto it along the body-z axis; everything in front of the plane
- * is bit-identical to the original render. UVs, normals, light, overlay and the
- * trim consumer operator pass through untouched, so the flattened region simply
- * reads as squashed against the back instead of poking out of it.
+ * keeps its transformed position. UVs, light, overlay and the trim consumer
+ * operator pass through untouched.</p>
  *
  * <p>FGM 5 routes ALL breast geometry (skin, jacket-wear, armor, trim, glint)
  * through this one command, and every transform chain involved runs through the
@@ -74,9 +79,37 @@ public abstract class BreastRenderCommandMixin {
 		//direction). Using the un-normalized linear part keeps everything affine
 		//and scale-consistent: p' = p + (0,0,Δ) maps back to q' = q + R·(0,0,Δ)
 		Vector3f pullDir = window.view().transformDirection(new Vector3f(0.0F, 0.0F, 1.0F));
+		float roundness = window.roundness();
+		if(roundness > 0.0F) {
+			//Shape Studio roundness: emit the superellipsoid mesh instead of the flat
+			//box quads. Same back-flatten clamp applies afterwards — from here on a
+			//mesh vertex is just another local-space point like a box vertex.
+			RoundBreastMesh mesh = RoundBreastMesh.of(this.model, roundness);
+			float[] d = mesh.data;
+			for(int quad = 0; quad < mesh.quadCount; quad++) {
+				for(int v = 0; v < 4; v++) {
+					int o = quad * 32 + v * 8;
+					Vector4f viewPos = new Vector4f(d[o], d[o + 1], d[o + 2], 1.0F).mul(pose);
+					Vector3f body = window.inv().transformPosition(new Vector3f(viewPos.x(), viewPos.y(), viewPos.z()));
+					if(body.z > planeZ) {
+						float depth = body.z - planeZ;
+						viewPos.x -= pullDir.x * depth;
+						viewPos.y -= pullDir.y * depth;
+						viewPos.z -= pullDir.z * depth;
+					}
+					Vector3f normal = new Vector3f(d[o + 3], d[o + 4], d[o + 5]).mul(normalMat);
+					buffer.addVertex(viewPos.x(), viewPos.y(), viewPos.z(), this.color,
+							d[o + 6], d[o + 7], this.overlay, this.light,
+							normal.x(), normal.y(), normal.z());
+				}
+			}
+			ci.cancel();
+			return;
+		}
 		for(WildfireModelRenderer.TexturedQuad quad : this.model.quads) {
-			//FGM skips quads with degenerate UVs; keep the exact same filter
-			if(quad.uvs[0] == 0.0F && quad.uvs[1] == 0.0F && quad.uvs[2] == 0.0F && quad.uvs[3] == 0.0F) {
+			//UVLayout can leave null slots for disabled faces; the mesh branch filters
+			//them, so the flat branch must too (upstream renderBox would NPE here)
+			if(quad == null || (quad.uvs[0] == 0.0F && quad.uvs[1] == 0.0F && quad.uvs[2] == 0.0F && quad.uvs[3] == 0.0F)) {
 				continue;
 			}
 			Vector3f normal = new Vector3f(quad.normal.x(), quad.normal.y(), quad.normal.z()).mul(normalMat);

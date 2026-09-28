@@ -14,5 +14,7 @@
   "fgmplus.studio.debug_tip": "绿色半透明面板 = 计算出的躯干背面基准；贴身则防穿模钳制可信",
   "fgmplus.studio.sound_none": "未找到 .ogg（试听播原版）",
   "fgmplus.studio.sound_pending": "%d 个音效待生效（点试听自动重载）",
-  "fgmplus.studio.sound_enabled": "已启用 %d 个音效： %s"
+  "fgmplus.studio.sound_enabled": "已启用 %d 个音效： %s",
+  "fgmplus.studio.roundness": "圆度: %s%%",
+  "fgmplus.studio.roundness_tip": "0% = 原版方块形，100% = 全圆形；皮肤/外套/护甲全部一起变成超椭球面"
 }

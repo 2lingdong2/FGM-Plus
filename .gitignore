@@ -8,3 +8,7 @@ dist/
 
 # FGM upstream source snapshots (re-clone from the release tag when needed)
 ref/
+
+# offline probe build artifacts (the probe .java sources are committed)
+platforms/1.21.11-fabric/_probe/lib/
+platforms/1.21.11-fabric/_probe/out/

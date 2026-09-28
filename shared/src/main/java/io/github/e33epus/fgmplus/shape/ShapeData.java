@@ -12,13 +12,16 @@ import io.netty.buffer.ByteBuf;
  * back; the Shape Studio slider negates on both read and write so that
  * dragging right always protrudes. (The class doc on the 1.20.1 port wrongly
  * claimed positive = protrude; the render math below is authoritative.)
- * Wire format: 7 floats, 28 bytes, carried in the fgmplus:shape_sync payload.
+ * Roundness (0..1) morphs the flat 4x5x3 model box toward a superellipsoid; the
+ * mesh deformation itself lives in the per-platform render layer.
+ * Wire format: 8 floats, 32 bytes, carried in the fgmplus:shape_sync payload.
  */
 public final class ShapeData {
 
 	public static final float MIN_SCALE = 0.1F, MAX_SCALE = 3.0F;
 	public static final float MIN_PERK = -30.0F, MAX_PERK = 60.0F;
 	public static final float MIN_OFFSET = -1.0F, MAX_OFFSET = 1.0F; //model units, 1.0 = 16 px
+	public static final float MIN_ROUNDNESS = 0.0F, MAX_ROUNDNESS = 1.0F; //0 = vanilla box, 1 = full sphere
 
 	private float scaleX = 1.0F;
 	private float scaleY = 1.0F;
@@ -27,6 +30,7 @@ public final class ShapeData {
 	private float offsetX = 0.0F;
 	private float offsetY = 0.0F;
 	private float offsetZ = 0.0F;
+	private float roundness = 0.0F;
 
 	private static float clamp(float value, float min, float max) {
 		return Math.max(min, Math.min(max, value));
@@ -89,10 +93,19 @@ public final class ShapeData {
 		this.offsetZ = clamp(value, MIN_OFFSET, MAX_OFFSET);
 	}
 
+	/** 0 = vanilla box geometry, 1 = full superellipsoid (sphere); intermediate values round the edges. */
+	public float getRoundness() {
+		return roundness;
+	}
+
+	public void setRoundness(float value) {
+		this.roundness = clamp(value, MIN_ROUNDNESS, MAX_ROUNDNESS);
+	}
+
 	/** True when every field is at its default; default shapes are never stored or worth syncing. */
 	public boolean isDefault() {
 		return scaleX == 1.0F && scaleY == 1.0F && scaleZ == 1.0F && perkiness == 0.0F
-				&& offsetX == 0.0F && offsetY == 0.0F && offsetZ == 0.0F;
+				&& offsetX == 0.0F && offsetY == 0.0F && offsetZ == 0.0F && roundness == 0.0F;
 	}
 
 	public void write(ByteBuf buffer) {
@@ -103,6 +116,7 @@ public final class ShapeData {
 		buffer.writeFloat(offsetX);
 		buffer.writeFloat(offsetY);
 		buffer.writeFloat(offsetZ);
+		buffer.writeFloat(roundness);
 	}
 
 	public static ShapeData read(ByteBuf buffer) {
@@ -118,6 +132,10 @@ public final class ShapeData {
 			shape.setOffsetX(finite(buffer.readFloat(), 0.0F));
 			shape.setOffsetY(finite(buffer.readFloat(), 0.0F));
 			shape.setOffsetZ(finite(buffer.readFloat(), 0.0F));
+		}
+		//roundness joined in a later release; packets from clients without it simply end here
+		if(buffer.readableBytes() >= 4) {
+			shape.setRoundness(finite(buffer.readFloat(), 0.0F));
 		}
 		return shape;
 	}
@@ -135,6 +153,7 @@ public final class ShapeData {
 		json.addProperty("offsetX", offsetX);
 		json.addProperty("offsetY", offsetY);
 		json.addProperty("offsetZ", offsetZ);
+		json.addProperty("roundness", roundness);
 		return json;
 	}
 
@@ -151,6 +170,7 @@ public final class ShapeData {
 		shape.setOffsetX(optFloat(json, "offsetX", 0.0F));
 		shape.setOffsetY(optFloat(json, "offsetY", 0.0F));
 		shape.setOffsetZ(optFloat(json, "offsetZ", 0.0F));
+		shape.setRoundness(optFloat(json, "roundness", 0.0F));
 		return shape;
 	}
 
@@ -172,6 +192,7 @@ public final class ShapeData {
 		copy.offsetX = this.offsetX;
 		copy.offsetY = this.offsetY;
 		copy.offsetZ = this.offsetZ;
+		copy.roundness = this.roundness;
 		return copy;
 	}
 }

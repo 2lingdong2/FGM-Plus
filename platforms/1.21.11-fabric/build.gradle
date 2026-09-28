@@ -40,6 +40,23 @@ dependencies {
 	modImplementation "maven.modrinth:female-gender:${project.fgm_version}"
 }
 
+loom {
+	runs {
+		client {
+			//Offline smoke hook: FGMPLUS_QUICKPLAY='<world name>' jumps straight into
+			//that singleplayer world on launch as a FIXED dev user (Player296, so the
+			//pre-seeded per-UUID FGM config + fgmplus shape files match). The breast
+			//render path only runs with a level loaded (GenderLayer bails on the main
+			//menu), so the automated smoke needs this to actually exercise the mesh
+			//code. Unset = normal interactive launch
+			def quickplay = System.getenv('FGMPLUS_QUICKPLAY')
+			if(quickplay != null && !quickplay.isEmpty()) {
+				programArgs '--quickPlaySingleplayer', quickplay, '--username', 'Player296'
+			}
+		}
+	}
+}
+
 processResources {
 	inputs.property 'version', project.mod_version
 	inputs.property 'minecraft_dependency', project.minecraft_dependency
