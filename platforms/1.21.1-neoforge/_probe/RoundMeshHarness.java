@@ -58,13 +58,17 @@ public class RoundMeshHarness {
             }
         }
         boolean inside = true, unit = true;
+        float maxX = Float.NEGATIVE_INFINITY;
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o], y = mesh.data[o + 1], z = mesh.data[o + 2];
-            //box: x -4..0, y 0..5, z 0..4 px -> /16 world units
-            if(x < -4f / 16 - 1e-4 || x > 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 4f / 16 + 1e-4) {
+            //box: x -4..0, y 0..5, z 0..4 px -> /16 world units; the cleavage bridge
+            //may push inner-side vertices past the old inner face (x=0) by up to
+            //hx * CLEAVAGE_BRIDGE * roundness = 2 * 0.75 * 0.85 = 1.275 px
+            if(x < -4f / 16 - 1e-4 || x > 1.3f / 16 + 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 4f / 16 + 1e-4) {
                 inside = false;
                 System.out.println("  outside vertex at " + o + ": " + x + "," + y + "," + z);
             }
+            maxX = Math.max(maxX, x);
             float nx = mesh.data[o + 3], ny = mesh.data[o + 4], nz = mesh.data[o + 5];
             if(Math.abs(nx * nx + ny * ny + nz * nz - 1f) > 1e-3) unit = false;
             float u = mesh.data[o + 6], v = mesh.data[o + 7];
@@ -83,10 +87,19 @@ public class RoundMeshHarness {
         float maxDist = 0f;
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o] * 16 + 2, y = mesh.data[o + 1] * 16 - 2.5f, z = mesh.data[o + 2] * 16 - 2f;
+            if(x >= 0) continue; //bridged inner half is intentionally NOT the pure surface
             maxDist = Math.max(maxDist, (float) Math.sqrt(x * x / 4f + y * y / 6.25f + z * z / 4f));
         }
         float theory = (float) Math.sqrt(Math.pow(3, 1 - 2 * 0.85 / 2));
         check("curvature-applied", Math.abs(maxDist - theory) < 1e-3, "max=" + maxDist + " theory=" + theory);
+
+        //cleavage bridge actually applied: inner-side vertices cross the torso
+        //centerline plane (world x = 0), so the two bridged surfaces interpenetrate
+        //and the void between the rounds closes into a crease the clothes span.
+        //Theoretical max push-past = hx * CLEAVAGE_BRIDGE * r = 1.275 px; subdivided
+        //vertices land just short of it.
+        check("cleavage-bridge", maxX > 0.5f / 16 && maxX <= 1.3f / 16,
+                "max world x=" + (maxX * 16) + "px (must cross the centerline plane x=0)");
 
         System.out.println(failures == 0 ? "ALL PASS" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);

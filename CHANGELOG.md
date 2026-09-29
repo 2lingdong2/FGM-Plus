@@ -21,6 +21,7 @@
 - 深度滑条同值体型与 1.21.11 端一致：渲染深度系数从 FGM 3.2.x 的 0.0625/格改为 FGM 5 的 0.0425/格（有意偏离 3.2.x 原生手感以对齐基准端）
 - NeoForge 端形状同步 mixin 移入公共 mixin 列表，专用服务器上远端玩家造型不再全部回退默认
 - 防穿模钳制窗口不再被诊断平面无条件回收，捕获失败改为 debug 日志可观测；幼年体型分支的矩阵顺序与 FGM 正向链对齐
+- 1.21.1 双端高圆度下两球之间的乳沟空洞收拢：内侧半轴向躯干中线桥接，两个曲面在中线交叠出一条自然乳沟，衣服贴图横跨乳沟而不再露出空洞
 
 ----
 
@@ -37,6 +38,7 @@
 - Depth slider values now yield the same body shape as 1.21.11: the render depth coefficient follows FGM 5's 0.0425/unit instead of 3.2.x's 0.0625 (an intentional deviation from the native 3.2.x feel to match the baseline)
 - The NeoForge shape-sync mixin now ships in the common mixin list, so remote players' shapes no longer fall back to defaults on dedicated servers
 - The anti-clip clamp window is no longer consumed unconditionally by the diagnostic plane, and capture failures are observable via debug-log counters; the baby-body branch matrix order now matches FGM's forward chain
+- On the 1.21.1 ports the wedge-shaped void between the two rounds at high roundness is closed: the inner half-axis bridges toward the torso centerline so the two surfaces meet in a natural crease, and the clothes texture spans it instead of falling into a hole
 
 **Added**
 
