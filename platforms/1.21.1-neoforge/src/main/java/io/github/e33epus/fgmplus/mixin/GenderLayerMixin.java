@@ -6,6 +6,7 @@ import com.wildfire.main.WildfireGender;
 import com.wildfire.main.entitydata.PlayerConfig;
 import com.wildfire.render.GenderLayer;
 import com.wildfire.render.WildfireModelRenderer;
+import io.github.e33epus.fgmplus.FgmPlusMod;
 import io.github.e33epus.fgmplus.render.RoundBreastMesh;
 import io.github.e33epus.fgmplus.shape.ShapeData;
 import io.github.e33epus.fgmplus.shape.ShapeHolder;
@@ -86,9 +87,10 @@ public abstract class GenderLayerMixin {
 
     //Body view (entry pose + baby/body-part transform) and its inverse, both built
     //once per breast per frame in fp$captureSize; fp$flattenBack clamps against the
-    //inverse, fp$drawDebugPlane lifts the panel through the forward one. Both are
-    //nulled at the capture-window TAIL; null = outside the window -> vanilla path.
-    //Static because renderBox is static.
+    //inverse, fp$drawDebugPlane lifts the panel through the forward one. The window
+    //lives until the next capture replaces it (only the drawn debug plane drops it
+    //early); null = outside the window -> vanilla path. Static because renderBox
+    //is static.
     @Unique private static Matrix4f fp$bodyView;
     @Unique private static Matrix4f fp$bodyViewInv;
     //Roundness of the shape captured for the current window (renderBox is static,
@@ -97,6 +99,12 @@ public abstract class GenderLayerMixin {
     //0-based renderBox call index inside the current capture window (body, then
     //jacket-wear, then armor passes); reset per breast in fp$captureSize
     @Unique private static int fp$boxIndex;
+    //Field verdict counters for the live debugging ritual (PLAN P1-6): hits count
+    //renderBox calls that actually clamped inside a live window, fallbacks count
+    //the silent vanilla-path escapes. Flushed at most once per second at debug level.
+    @Unique private static int fp$flattenHits;
+    @Unique private static int fp$flattenFallbacks;
+    @Unique private static long fp$nextFlattenLogMs;
 
     @Unique private static float fp$realScale(float param) {
         float bSize = param > fp$PARAM_FOLD ? (param + fp$PARAM_FOLD) * 0.5F : param;
@@ -104,6 +112,20 @@ public abstract class GenderLayerMixin {
             return 1.0F;
         }
         return Math.min(1.0F + (bSize - fp$VANILLA_BUST_CAP) * fp$SCALE_GAIN, fp$SCALE_MAX);
+    }
+
+    //Rate-limited (1/s) debug verdict for the live ritual: hits > 0 while the mesh
+    //is visible = the clamp window is alive; hits == 0 = hunt the capture path
+    @Unique
+    private static void fp$logFlattenVerdict() {
+        long now = System.currentTimeMillis();
+        if (now < fp$nextFlattenLogMs) {
+            return;
+        }
+        fp$nextFlattenLogMs = now + 1000L;
+        FgmPlusMod.LOGGER.debug("FGM Plus flatten verdict (1s): hits={}, fallbacks={}", fp$flattenHits, fp$flattenFallbacks);
+        fp$flattenHits = 0;
+        fp$flattenFallbacks = 0;
     }
 
     //Parameter list mirrors the 3.2.2 descriptor exactly:
@@ -132,7 +154,7 @@ public abstract class GenderLayerMixin {
         }
         //Body view = entry pose (the stack is untouched at HEAD) + the transforms FGM
         //applies right after (verified in the 3.2.2 bytecode: optional baby
-        //scale(1/babyBodyScale) + translate(0, bodyYOffset/16, 0), then
+        //scale(babyBodyScale) + translate(0, bodyYOffset/16, 0), then
         //translate(body.xyz * 0.0625) then guarded zRot/yRot/xRot mulPose). Two
         //consumers inside the capture window: fp$flattenBack (the back-flatten
         //clamp, always on) clamps against the inverse, and fp$drawDebugPlane lifts
@@ -148,9 +170,12 @@ public abstract class GenderLayerMixin {
             if (entity.isBaby()) {
                 //babyBodyScale/bodyYOffset are private final on AgeableListModel in
                 //1.21.1 (FGM reads them through its own accesstransformer.cfg) —
-                //this accessor keeps the access mixin-local
+                //this accessor keeps the access mixin-local.
+                //FGM's forward chain is scale(babyBodyScale) then the bodyYOffset
+                //translate (3.2.2 bytecode offsets 28/44; baseline 1.21.11 does the
+                //same) — the old 1/scale inversion mismatched it
                 AgeableListModelAccessor modelAccess = (AgeableListModelAccessor) model;
-                float s = 1.0F / modelAccess.fgmplus$babyBodyScale();
+                float s = modelAccess.fgmplus$babyBodyScale();
                 view.scale(s, s, s);
                 view.translate(0.0F, modelAccess.fgmplus$bodyYOffset() / 16.0F, 0.0F);
             }
@@ -162,8 +187,12 @@ public abstract class GenderLayerMixin {
             Matrix4f inv = view.invert(new Matrix4f());
             fp$bodyView = view;
             fp$bodyViewInv = inv;
-        } catch (Exception ignored) {
-            //degenerate pose: clamp and panel fall back to vanilla rendering
+        } catch (Exception e) {
+            //degenerate pose: clamp and panel fall back to vanilla rendering —
+            //never silent: this fallback is the P1 suspect behind "pokes out a bit"
+            fp$flattenFallbacks++;
+            fp$logFlattenVerdict();
+            FgmPlusMod.LOGGER.debug("FGM Plus: capture window lost (degenerate pose), vanilla fallback", e);
         }
     }
 
@@ -210,9 +239,13 @@ public abstract class GenderLayerMixin {
         //Offsets are applied in body space (before the tilt rotations and the later
         //scale call), so they are never magnified by the scale; front = -z, back =
         //+z (user-measured via the diagnostic panel), so NEGATIVE offsetZ protrudes
-        //toward the chest front and positive offsetZ pulls back toward the torso
+        //toward the chest front and positive offsetZ pulls back toward the torso.
+        //The depth recompute deliberately uses FGM 5's per-unit coefficient 0.0425
+        //instead of 3.2.x's 0.0625: an intentional deviation from the local upstream
+        //so the rendered body matches the 1.21.11 baseline at equal slider values
+        //(expectedZ above must keep 0.0625 — it fingerprints FGM's actual argument).
         stack.translate(x + shape.getOffsetX(), y + shape.getOffsetY(),
-            zOff - 0.0625F * 2F + fp$breastOffsetZ * 0.0625F + shape.getOffsetZ());
+            zOff - 0.0625F * 2F + fp$breastOffsetZ * 0.0425F + shape.getOffsetZ());
     }
 
     //FFF-ordinal 6: the hang shift that keeps growing with bust size
@@ -253,7 +286,10 @@ public abstract class GenderLayerMixin {
         Matrix4f bodyView = fp$bodyView;
         Matrix4f bodyInv = fp$bodyViewInv;
         if (bodyView == null || bodyInv == null) {
-            return; //outside the capture window or degenerate pose -> original render
+            //outside the capture window or degenerate pose -> original render
+            fp$flattenFallbacks++;
+            fp$logFlattenVerdict();
+            return;
         }
         Matrix4f pose = matrixStack.last().pose();
         Matrix3f normalMat = matrixStack.last().normal();
@@ -268,6 +304,8 @@ public abstract class GenderLayerMixin {
         //and scale-consistent: p' = p + (0,0,Δ) maps back to q' = q + R·(0,0,Δ)
         Vector3f pullDir = bodyView.transformDirection(new Vector3f(0.0F, 0.0F, 1.0F));
         float roundness = fp$roundness;
+        fp$flattenHits++;
+        fp$logFlattenVerdict();
         if (roundness > 0.0F) {
             //Shape Studio roundness: emit the superellipsoid mesh instead of the flat
             //box quads, then clamp exactly like the flat path
@@ -332,24 +370,26 @@ public abstract class GenderLayerMixin {
      * re-verified any time via the Shape Studio toggle. Vertices are submitted
      * in body-space local coordinates through the lifted body view.
      *
-     * Runs at TAIL, i.e. after FGM's popPose with no early returns upstream,
-     * so the buffer source is live and the captured entry pose matches the
-     * stack state the body transform was applied on top of.
+     * <p>Window lifecycle (baseline-aligned): the capture window is NOT consumed
+     * here unconditionally any more — the old always-clear at TAIL stranded any
+     * renderBox that arrived after a capture/timing hiccup on the vanilla path
+     * (no roundness, no back clamp). The window now lives until the next
+     * captureSize recapture replaces it, and is only dropped once the debug
+     * plane has actually drawn (same semantics as the 1.21.11 RenderCapture
+     * windows, which are only replaced by beginWindow).</p>
      */
     @Inject(method = "renderBreastWithTransforms", at = @At("TAIL"), require = 1, remap = false)
     private void fp$drawDebugPlane(LivingEntity entity, HumanoidModel<?> model, ItemStack armorStack, PoseStack matrixStack, MultiBufferSource bufferSource,
         RenderType breastRenderType, int packedLightIn, int packedOverlayIn, float alpha, boolean bounceEnabled, float totalX, float totalY,
         float bounceRotation, float breastSize, float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff, float outwardAngle,
         boolean uniboob, boolean airGate, boolean chestplateOccupied, boolean left, boolean jacketWear, CallbackInfo ci) {
-        //Consume the capture window: a frame without a capture must not draw a stale
-        //plane, and boxes after this point run the vanilla path
-        Matrix4f bodyView = fp$bodyView;
-        fp$bodyView = null;
-        fp$bodyViewInv = null;
-        fp$roundness = 0.0F;
         //FGM calls renderBreastWithTransforms twice per player (left + right) with
         //the same body and stack; drawing once is enough
-        if (!left || !ShapeRenderState.debugPlane || bodyView == null) {
+        if (!left || !ShapeRenderState.debugPlane) {
+            return;
+        }
+        Matrix4f bodyView = fp$bodyView;
+        if (bodyView == null) {
             return;
         }
         //Torso BACK plane: front = -z and back = +z (established empirically — the
@@ -365,6 +405,12 @@ public abstract class GenderLayerMixin {
         //must be visible no matter which side the camera is on
         fp$debugQuad(buffer, bodyView, -xHalf, yTop, backZ, xHalf, yBottom);
         fp$debugQuad(buffer, bodyView, xHalf, yTop, backZ, -xHalf, yBottom);
+        //Drop the window only now that the plane actually drew (a frame without a
+        //capture must not draw a stale plane); until the next recapture the window
+        //stays live so late renderBox calls still clamp instead of degrading
+        fp$bodyView = null;
+        fp$bodyViewInv = null;
+        fp$roundness = 0.0F;
     }
 
     @Unique

@@ -1,6 +1,7 @@
 # PLAN-fgmplus-1.6.1：1.21.1 双端对齐 1.21.11
 
-> 状态：待实施（下一会话执行）。本文档自包含，审计证据已钉死，照条目做即可。
+> 状态：已实施（2026-09-29 本会话照单施工，P0-4/P0-3/P1-5/P1-6/P0-2/P0-1 全做，
+> forge 1.20.1 不动）。
 > 背景：v1.6.1 候选。用户实机反馈 1.21.1-fabric 与 1.21.1-neoforge 相对基准端
 > platforms/1.21.11-fabric（已验收正本）存在：造型工作室界面完全不同、滑条数值结果
 > 不同、防穿模"总是突出一点"、模型渲染异常、衣柜入口按钮风格溢出。
@@ -123,7 +124,7 @@ GenderLayerMixin.java:142-149、neoforge:146-156）——既非正向也非真�
   javap 复核 + RoundMeshHarness 换真实 3.2.1 box 重跑（neoforge 侧命令：
   `java -cp "out;jar;../build/classes/java/main;lib/*" RoundMeshHarness` 已 ALL PASS 可参照）。
 - forge 1.20.1 端 ShapeStudioScreen 与 1.21.1 系出同门（同款自绘构图），用户未点名；
-  若 P0-1 验收后用户想把 forge 一并对齐，另行开项。
+  **用户已拍板：不对齐，保持 1.6.0 构图**（1.6.1 验收后也不做）。
 
 ## 实施顺序与验证
 

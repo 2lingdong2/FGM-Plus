@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.6.1
+
+**修复**
+
+- 造型工作室重排为与 1.21.11 端一致的中央半透明面板构图（FGM 5 式 166px 网格、15px 按钮、标题居中、左侧玩家预览小窗），ESC 现在返回衣柜而不再直接退出游戏
+- 衣柜「造型工作室」入口按钮不再绘制贴图上不存在的灰色边框，按钮行位两端统一
+- 深度滑条同值体型与 1.21.11 端一致：渲染深度系数从 FGM 3.2.x 的 0.0625/格改为 FGM 5 的 0.0425/格（有意偏离 3.2.x 原生手感以对齐基准端）
+- NeoForge 端形状同步 mixin 移入公共 mixin 列表，专用服务器上远端玩家造型不再全部回退默认
+- 防穿模钳制窗口不再被诊断平面无条件回收，捕获失败改为 debug 日志可观测；幼年体型分支的矩阵顺序与 FGM 正向链对齐
+
+----
+
+**Fixed**
+
+- The Shape Studio is recomposed into the centered translucent-panel layout of the 1.21.11 port (FGM 5 grid, 15px buttons, centered title, left player preview window), and ESC now returns to the wardrobe instead of quitting the game
+- The wardrobe's Shape Studio entry button no longer draws a gray ghost frame the texture never has; button rows are unified across both ports
+- Depth slider values now yield the same body shape as 1.21.11: the render depth coefficient follows FGM 5's 0.0425/unit instead of 3.2.x's 0.0625 (an intentional deviation from the native 3.2.x feel to match the baseline)
+- The NeoForge shape-sync mixin now ships in the common mixin list, so remote players' shapes no longer fall back to defaults on dedicated servers
+- The anti-clip clamp window is no longer consumed unconditionally by the diagnostic plane, and capture failures are observable via debug-log counters; the baby-body branch matrix order now matches FGM's forward chain
+
 ## v1.6.0
 
 **新增**

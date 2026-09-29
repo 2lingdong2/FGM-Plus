@@ -10,7 +10,8 @@
     "ConfigKeyAccessor",
     "FloatConfigKeyMixin",
     "NumberConfigKeyMixin",
-    "PlayerConfigMixin"
+    "PlayerConfigMixin",
+    "WildfireSyncServerMixin"
   ],
   "client": [
     "AgeableListModelAccessor",
@@ -18,7 +19,6 @@
     "GenderLayerMixin",
     "WardrobeBrowserScreenMixin",
     "WildfireEventHandlerMixin",
-    "WildfireSyncClientMixin",
-    "WildfireSyncServerMixin"
+    "WildfireSyncClientMixin"
   ]
 }

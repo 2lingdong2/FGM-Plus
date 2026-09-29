@@ -35,14 +35,13 @@ public abstract class WardrobeBrowserScreenMixin extends Screen {
     private void fp$addShapeStudioButton(CallbackInfo ci) {
         //'this' is the merged WardrobeBrowserScreen instance at runtime, so the
         //protected addRenderableWidget is reachable through the Screen superclass.
-        //Stack the button directly below the wardrobe's own right-column flow
-        //(158px buttons, 20px pitch — same geometry as the 3.1 screens, verified
-        //in the 3.2.2 init bytecode): female shows two buttons (last at y-12),
-        //male shows one (last at y-32), so the entry follows at y+8 / y-12
+        //Stack the button in the hollow interior below the wardrobe's own
+        //right-column flow (158x20 buttons; PLAN P0-2 unified the rows with the
+        //fabric port: the old y+8/y-12 sat on the texture's separator band)
         UUID uuid = ((BaseWildfireScreenAccessor) this).fgmplus$getPlayerUUID();
         PlayerConfig plr = WildfireGender.getPlayerById(uuid);
         int y = this.height / 2;
-        int yPos = plr != null && plr.getGender().canHaveBreasts() ? y + 8 : y - 12;
+        int yPos = plr != null && plr.getGender().canHaveBreasts() ? y + 16 : y - 4;
         this.addRenderableWidget(new WildfireButton(this.width / 2 - 42, yPos, 158, 20,
                 Component.translatable("fgmplus.studio.entry"),
                 button -> Minecraft.getInstance().setScreen(new ShapeStudioScreen(
@@ -53,10 +52,12 @@ public abstract class WardrobeBrowserScreenMixin extends Screen {
     //jar's own renderBackground override
     @Inject(method = "renderBackground", at = @At("TAIL"), require = 1, remap = false)
     private void fp$drawPanelExtension(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
-        //The wardrobe textures end the right-hand panel right after FGM's own
-        //buttons, so the entry button would hang in transparent space. Draw a
-        //matching panel extension (same measured colors as the 3.1 textures:
-        //interior 10,10,10; border 107,107,107) after the background blit; the
+        //The wardrobe textures end the right-hand panel's interior right after FGM's
+        //own buttons (measured: interior through texture row 83 female / 63 male)
+        //and the region below is HOLLOW — no right or bottom border exists there,
+        //so the extension draws the interior fill only. Any self-drawn border/band
+        //fill is a ghost frame the texture never had (PLAN P0-2: the "vanilla-gray
+        //overflow" screenshot root cause). Drawn after the background blit; the
         //texture's transparent pixels let it show through.
         UUID uuid = ((BaseWildfireScreenAccessor) this).fgmplus$getPlayerUUID();
         PlayerConfig plr = WildfireGender.getPlayerById(uuid);
@@ -64,15 +65,10 @@ public abstract class WardrobeBrowserScreenMixin extends Screen {
         int y = this.height / 2;
         int left = (this.width - 248) / 2;
         int top = (this.height - 134) / 2;
-        int buttonTop = female ? y + 8 : y - 12;
-        int fillBottom = buttonTop + 23; //border band ends 5px below the button
-        //the texture's own panel border ends at y75 (bg2, female) / y56 (bg3, male);
-        //continue from there so the extension reads as one seamless panel
-        int fillTop = female ? 75 : 56;
-        //side borders and interior, same column layout as the texture
-        graphics.fill(left + 77, top + fillTop, left + 82, fillBottom + 2, 0xFF6B6B6B);
-        graphics.fill(left + 83, top + fillTop, left + 240, fillBottom, 0xFF0A0A0A);
-        graphics.fill(left + 240, top + fillTop, left + 247, fillBottom + 2, 0xFF6B6B6B);
-        graphics.fill(left + 77, fillBottom, left + 247, fillBottom + 2, 0xFF6B6B6B);
+        int buttonTop = female ? y + 16 : y - 4;
+        int bandTop = buttonTop + 23; //3px below the button's bottom edge
+        //first texture row below the measured interior end (83 female / 63 male)
+        int fillTop = female ? 84 : 64;
+        graphics.fill(left + 83, top + fillTop, left + 240, bandTop, 0xFF0A0A0A);
     }
 }
