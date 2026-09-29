@@ -44,14 +44,14 @@ public class RoundMeshHarness {
         check("five-faces-present", faces == 5 && box.quads.length == 5,
                 "faces=" + faces + " quads.length=" + box.quads.length);
 
-        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F);
+        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F, true);
         System.out.println("quadCount=" + mesh.quadCount + " floats=" + mesh.data.length);
         check("nonempty-mesh", mesh.quadCount > 0 && mesh.data.length == mesh.quadCount * 32,
                 "quads=" + mesh.quadCount + " floats=" + mesh.data.length);
         check("quad-count-matches-faces", mesh.quadCount == expectedQuads,
                 "quads=" + mesh.quadCount + " expected=" + expectedQuads);
-        check("cache-stable", RoundBreastMesh.of(box, 0.85F) == mesh, "cache returned a fresh mesh");
-        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F) != mesh, "roundness change kept stale mesh");
+        check("cache-stable", RoundBreastMesh.of(box, 0.85F, true) == mesh, "cache returned a fresh mesh");
+        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F, true) != mesh, "roundness change kept stale mesh");
 
         //every vertex inside the source box envelope (anti-clip), every normal unit,
         //every UV in [0,1] (3.1's TexturedQuad ctor divides the px rect by the tex size)
@@ -59,7 +59,7 @@ public class RoundMeshHarness {
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o], y = mesh.data[o + 1], z = mesh.data[o + 2];
             //box: x -4..0, y 0..5, z 0..4 px -> /16 world units
-            if(x < -4f / 16 - 1e-4 || x > 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 4f / 16 + 1e-4) {
+            if(x < -4f / 16 - 1e-4 || x > 1.3f / 16 + 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 4f / 16 + 1e-4) {
                 inside = false;
                 System.out.println("  outside vertex at " + o + ": " + x + "," + y + "," + z);
             }
@@ -78,14 +78,24 @@ public class RoundMeshHarness {
         float maxDist = 0f;
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o] * 16 + 2, y = mesh.data[o + 1] * 16 - 2.5f, z = mesh.data[o + 2] * 16 - 2f;
+            if(x >= 0) continue; //bridged inner half is intentionally NOT the pure surface
             maxDist = Math.max(maxDist, (float) Math.sqrt(x * x / 4f + y * y / 6.25f + z * z / 4f));
         }
         float theory = (float) Math.sqrt(Math.pow(3, 1 - 2 * 0.85 / 2));
         check("curvature-applied", Math.abs(maxDist - theory) < 1e-3, "max=" + maxDist + " theory=" + theory);
 
+        //cleavage bridge: the bridged mesh's inner vertices must cross the torso
+        //centerline plane (world x = 0), while the plain (bridge-off) mesh must not
+        RoundBreastMesh plain = RoundBreastMesh.of(box, 0.85F, false);
+        float bridgedMaxX = Float.NEGATIVE_INFINITY, plainMaxX = Float.NEGATIVE_INFINITY;
+        for(int o = 0; o < mesh.data.length; o += 8) bridgedMaxX = Math.max(bridgedMaxX, mesh.data[o]);
+        for(int o = 0; o < plain.data.length; o += 8) plainMaxX = Math.max(plainMaxX, plain.data[o]);
+        check("cleavage-bridge", bridgedMaxX > 0.5f / 16 && bridgedMaxX <= 1.3f / 16 && plainMaxX <= 1e-4,
+                "bridged max x=" + (bridgedMaxX * 16) + "px plain max x=" + (plainMaxX * 16) + "px");
+
         //multi-slot cache: a second player at a different roundness must not evict
         //the first mesh (<= 3 slots kept)
-        RoundBreastMesh again = RoundBreastMesh.of(box, 0.85F);
+        RoundBreastMesh again = RoundBreastMesh.of(box, 0.85F, true);
         check("multi-slot-survives", again == mesh, "0.85 slot was evicted by 0.5");
 
         System.out.println(failures == 0 ? "ALL PASS" : failures + " FAILURES");

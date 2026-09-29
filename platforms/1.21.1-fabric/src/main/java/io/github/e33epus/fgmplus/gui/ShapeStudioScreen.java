@@ -158,6 +158,16 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
                     button.setMessage(Component.translatable(ShapeRenderState.debugPlane ? "fgmplus.studio.debug_on" : "fgmplus.studio.debug_off"));
                 },
                 Tooltip.create(Component.translatable("fgmplus.studio.debug_tip"))));
+        //Cleavage bridge toggle: off restores the plain superellipsoid (and FGM's
+        //own separation slider feel) for players who prefer the previous look
+        this.addRenderableWidget(new WildfireButton(bx, y + 88, 158, 20,
+                Component.translatable(shape.isCleavage() ? "fgmplus.studio.cleavage_on" : "fgmplus.studio.cleavage_off"), button -> {
+                    boolean bridged = !((ShapeHolder) resolvePlayer()).fgmplus$getShape().isCleavage();
+                    ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setCleavage(bridged);
+                    persist("cleavage", bridged ? 1.0F : 0.0F);
+                    button.setMessage(Component.translatable(bridged ? "fgmplus.studio.cleavage_on" : "fgmplus.studio.cleavage_off"));
+                },
+                Tooltip.create(Component.translatable("fgmplus.studio.cleavage_tip"))));
 
         super.init();
     }
@@ -205,7 +215,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         super.renderBackground(graphics, mouseX, mouseY, partialTick);
         int x = this.width / 2;
         int y = this.height / 2;
-        graphics.fill(x + 28, y - 85, x + 190, y + 98, PANEL_FILL);
+        graphics.fill(x + 28, y - 85, x + 190, y + 134, PANEL_FILL);
         graphics.fill(x + 29, y - 84, x + 189, y - 60, PANEL_FILL);
     }
 
@@ -232,7 +242,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         int cx = x + 109; //center of the translucent panel (x+28..x+190)
         //Status text can exceed the 162 px panel (long file names); wrap it to the
         //panel width, at most two lines with an ellipsis tail
-        int ly = y + 88;
+        int ly = y + 112;
         for (String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, 150)) {
             graphics.drawCenteredString(this.font, line, cx, ly, 0xE0E0E0);
             ly += 10;

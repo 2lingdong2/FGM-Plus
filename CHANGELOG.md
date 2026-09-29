@@ -22,6 +22,7 @@
 - NeoForge 端形状同步 mixin 移入公共 mixin 列表，专用服务器上远端玩家造型不再全部回退默认
 - 防穿模钳制窗口不再被诊断平面无条件回收，捕获失败改为 debug 日志可观测；幼年体型分支的矩阵顺序与 FGM 正向链对齐
 - 1.21.1 双端高圆度下两球之间的乳沟空洞收拢：内侧半轴向躯干中线桥接，两个曲面在中线交叠出一条自然乳沟，衣服贴图横跨乳沟而不再露出空洞
+- 造型工作室新增「乳沟桥接」开关并同步四端：默认开启即上述效果，关闭恢复纯椭球轮廓，FGM 自带的胸部间距滑条恢复原有效果；开关随造型数据存盘并同步，所有人看到一致
 
 ----
 
@@ -39,6 +40,7 @@
 - The NeoForge shape-sync mixin now ships in the common mixin list, so remote players' shapes no longer fall back to defaults on dedicated servers
 - The anti-clip clamp window is no longer consumed unconditionally by the diagnostic plane, and capture failures are observable via debug-log counters; the baby-body branch matrix order now matches FGM's forward chain
 - On the 1.21.1 ports the wedge-shaped void between the two rounds at high roundness is closed: the inner half-axis bridges toward the torso centerline so the two surfaces meet in a natural crease, and the clothes texture spans it instead of falling into a hole
+- The Shape Studio gains a "Cleavage bridge" toggle synced to all four targets: ON by default (the effect above), OFF restores the plain superellipsoid and FGM's own separation slider feel; the toggle persists with the shape data and syncs, so everyone sees the same thing
 
 **Added**
 

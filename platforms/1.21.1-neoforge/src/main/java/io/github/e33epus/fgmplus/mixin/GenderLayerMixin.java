@@ -96,6 +96,8 @@ public abstract class GenderLayerMixin {
     //Roundness of the shape captured for the current window (renderBox is static,
     //so the instance shape field is mirrored here)
     @Unique private static float fp$roundness;
+    //Cleavage-bridge toggle captured alongside it (default on = the shipped look)
+    @Unique private static volatile boolean fp$cleavage = true;
     //0-based renderBox call index inside the current capture window (body, then
     //jacket-wear, then armor passes); reset per breast in fp$captureSize
     @Unique private static int fp$boxIndex;
@@ -146,11 +148,13 @@ public abstract class GenderLayerMixin {
         //Same lookup GenderLayer#render does; the shape is only read when a breast is actually rendered
         fp$shape = null;
         fp$roundness = 0.0F;
+        fp$cleavage = true;
         PlayerConfig plr = WildfireGender.getPlayerById(entity.getUUID());
         if (plr != null) {
             ShapeData shape = ((ShapeHolder) plr).fgmplus$getShape();
             fp$shape = shape;
             fp$roundness = shape.getRoundness();
+            fp$cleavage = shape.isCleavage();
         }
         //Body view = entry pose (the stack is untouched at HEAD) + the transforms FGM
         //applies right after (verified in the 3.2.2 bytecode: optional baby
@@ -309,7 +313,7 @@ public abstract class GenderLayerMixin {
         if (roundness > 0.0F) {
             //Shape Studio roundness: emit the superellipsoid mesh instead of the flat
             //box quads, then clamp exactly like the flat path
-            RoundBreastMesh mesh = RoundBreastMesh.of(model, roundness);
+            RoundBreastMesh mesh = RoundBreastMesh.of(model, roundness, fp$cleavage);
             float[] d = mesh.data;
             for (int quad = 0; quad < mesh.quadCount; quad++) {
                 for (int v = 0; v < 4; v++) {

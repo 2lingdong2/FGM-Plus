@@ -84,7 +84,7 @@ public abstract class BreastRenderCommandMixin {
 			//Shape Studio roundness: emit the superellipsoid mesh instead of the flat
 			//box quads. Same back-flatten clamp applies afterwards — from here on a
 			//mesh vertex is just another local-space point like a box vertex.
-			RoundBreastMesh mesh = RoundBreastMesh.of(this.model, roundness);
+			RoundBreastMesh mesh = RoundBreastMesh.of(this.model, roundness, window.cleavage());
 			float[] d = mesh.data;
 			for(int quad = 0; quad < mesh.quadCount; quad++) {
 				for(int v = 0; v < 4; v++) {

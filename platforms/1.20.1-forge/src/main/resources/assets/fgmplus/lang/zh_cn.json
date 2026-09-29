@@ -16,5 +16,8 @@
   "fgmplus.studio.debug_tip": "绿色半透明面板 = 计算出的躯干背面基准；贴身则防穿模钳制可信",
   "fgmplus.studio.sound_none": "未找到 .ogg（试听播原版）",
   "fgmplus.studio.sound_pending": "%d 个音效待生效（点试听自动重载）",
-  "fgmplus.studio.sound_enabled": "已启用 %d 个音效： %s"
+  "fgmplus.studio.sound_enabled": "已启用 %d 个音效： %s",
+  "fgmplus.studio.cleavage_on": "乳沟桥接：开",
+  "fgmplus.studio.cleavage_off": "乳沟桥接：关",
+  "fgmplus.studio.cleavage_tip": "高圆度时把内侧向躯干中线桥接，两个曲面交叠成一条乳沟；关闭恢复纯椭球轮廓，FGM 的胸部间距滑条恢复原有效果"
 }

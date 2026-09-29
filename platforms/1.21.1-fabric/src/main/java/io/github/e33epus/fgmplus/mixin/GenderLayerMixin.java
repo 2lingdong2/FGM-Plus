@@ -100,6 +100,8 @@ public abstract class GenderLayerMixin {
     //Roundness of the shape captured for the current window (renderBox is static,
     //so the instance shape field is mirrored here)
     @Unique private static volatile float fp$roundness;
+    //Cleavage-bridge toggle captured alongside it (default on = the shipped look)
+    @Unique private static volatile boolean fp$cleavage = true;
     //True while GenderArmorLayer's renderSides pass is running (this instanceof
     //GenderArmorLayer at capture time): armor boxes clamp a hair OUTSIDE the body plane
     @Unique private static boolean fp$armorPass;
@@ -150,11 +152,13 @@ public abstract class GenderLayerMixin {
     private void fp$capture(LivingEntity entity, HumanoidModel<?> model, PoseStack matrixStack, BreastSide side, CallbackInfo ci) {
         fp$shape = null;
         fp$roundness = 0.0F;
+        fp$cleavage = true;
         PlayerConfig plr = WildfireGender.getPlayerById(entity.getUUID());
         if (plr != null) {
             ShapeData shape = ((ShapeHolder) plr).fgmplus$getShape();
             fp$shape = shape;
             fp$roundness = shape.getRoundness();
+            fp$cleavage = shape.isCleavage();
         }
         fp$armorPass = ((Object) this) instanceof GenderArmorLayer;
         fp$boxIndex = 0;
@@ -305,7 +309,7 @@ public abstract class GenderLayerMixin {
         if (roundness > 0.0F) {
             //Shape Studio roundness: emit the superellipsoid mesh instead of the flat
             //box quads, then clamp exactly like the flat path
-            RoundBreastMesh mesh = RoundBreastMesh.of(model, roundness);
+            RoundBreastMesh mesh = RoundBreastMesh.of(model, roundness, fp$cleavage);
             float[] d = mesh.data;
             for (int quad = 0; quad < mesh.quadCount; quad++) {
                 for (int v = 0; v < 4; v++) {

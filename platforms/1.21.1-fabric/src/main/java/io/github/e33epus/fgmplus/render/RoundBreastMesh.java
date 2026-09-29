@@ -67,17 +67,22 @@ public final class RoundBreastMesh {
         this.roundness = roundness;
     }
 
-    /** Cached mesh of {@code box} at {@code roundness}; never null for roundness > 0. */
-    public static RoundBreastMesh of(WildfireModelRenderer.ModelBox box, float roundness) {
+    /**
+     * Cached mesh of {@code box} at {@code roundness}; never null for roundness > 0.
+     * {@code bridged} toggles the cleavage bridge; it rides in the cache key's
+     * integer part (roundness stays below 1, the off-state adds 10).
+     */
+    public static RoundBreastMesh of(WildfireModelRenderer.ModelBox box, float roundness, boolean bridged) {
+        float key = bridged ? roundness : 10.0F + roundness;
         Map<Float, RoundBreastMesh> slots = CACHE.computeIfAbsent(box, k -> new java.util.HashMap<>());
         synchronized(slots) {
             if(slots.size() > 3) {
                 slots.clear();
             }
-            RoundBreastMesh mesh = slots.get(roundness);
+            RoundBreastMesh mesh = slots.get(key);
             if(mesh == null) {
-                mesh = build(box, roundness);
-                slots.put(roundness, mesh);
+                mesh = build(box, roundness, bridged);
+                slots.put(key, mesh);
                 //cache-miss only; the first-line observability for
                 //"the roundness slider does nothing" reports
                 FgmPlusMod.LOGGER.debug("FGM Plus built round mesh: quads={}, roundness={}", mesh.quadCount, roundness);
@@ -86,7 +91,7 @@ public final class RoundBreastMesh {
         }
     }
 
-    private static RoundBreastMesh build(WildfireModelRenderer.ModelBox box, float roundness) {
+    private static RoundBreastMesh build(WildfireModelRenderer.ModelBox box, float roundness, boolean bridged) {
         //exponent for the box->sphere continuum: roundness 1 -> n=2 (sphere);
         //clamped away from 0 so callers can pass small values without pow blowups
         float r = Math.max(roundness, 0.01F);
@@ -119,7 +124,7 @@ public final class RoundBreastMesh {
         //box on the -x half bridges toward +x and vice versa; 0 disables the
         //bridge for a box centered on the centerline (breast boxes never are)
         float bridgeSign = Math.abs(cx) < 1.0e-3f ? 0.0F : -Math.signum(cx);
-        float ext = 1.0F + CLEAVAGE_BRIDGE * r;
+        float ext = bridged ? 1.0F + CLEAVAGE_BRIDGE * r : 1.0F;
 
         //each subdivided face quad is [x, y, z, nx, ny, nz, u, v] x 4; one source face
         //yields segS x segT sub-quads, so the total is counted before allocating

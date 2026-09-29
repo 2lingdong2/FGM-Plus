@@ -96,6 +96,8 @@ public abstract class GenderLayerMixin {
     //fp$flattenBack stays bit-identical to FGM's render); read in fp$flattenBack
     //to swap the flat quad emission for the superellipsoid mesh
     @Unique private static volatile float fp$roundness;
+    //Cleavage-bridge toggle captured alongside it (default on = the shipped look)
+    @Unique private static volatile boolean fp$cleavage = true;
 
     @Unique private static float fp$realScale(float param) {
         float bSize = param > fp$PARAM_FOLD ? (param + fp$PARAM_FOLD) * 0.5F : param;
@@ -120,6 +122,7 @@ public abstract class GenderLayerMixin {
             fp$shape = ((ShapeHolder) plr).fgmplus$getShape();
         }
         fp$roundness = fp$shape != null ? fp$shape.getRoundness() : 0.0F;
+        fp$cleavage = fp$shape == null || fp$shape.isCleavage();
         //Body view = entry pose (the stack is untouched at HEAD) + the body-part
         //transform FGM applies right after (GenderLayer source:
         //translate(body.xyz * 0.0625) then guarded zRot/yRot/xRot mulPose). Two
@@ -258,7 +261,7 @@ public abstract class GenderLayerMixin {
             //Shape Studio roundness: emit the superellipsoid mesh instead of the flat
             //box quads. Same back-flatten clamp applies afterwards — from here on a
             //mesh vertex is just another local-space point like a box vertex
-            RoundBreastMesh mesh = RoundBreastMesh.of(model, fp$roundness);
+            RoundBreastMesh mesh = RoundBreastMesh.of(model, fp$roundness, fp$cleavage);
             float[] d = mesh.data;
             for (int quad = 0; quad < mesh.quadCount; quad++) {
                 for (int v = 0; v < 4; v++) {
@@ -335,6 +338,7 @@ public abstract class GenderLayerMixin {
         fp$bodyView = null;
         fp$bodyViewInv = null;
         fp$roundness = 0.0F;
+        fp$cleavage = true;
         //FGM calls renderBreastWithTransforms twice per player (left + right) with
         //the same body and stack; drawing once is enough
         if (!left || !ShapeRenderState.debugPlane || bodyView == null) {

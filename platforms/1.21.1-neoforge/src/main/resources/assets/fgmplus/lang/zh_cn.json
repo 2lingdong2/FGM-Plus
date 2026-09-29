@@ -16,5 +16,8 @@
   "fgmplus.studio.sound_pending": "%d 个音效待生效（点试听自动重载）",
   "fgmplus.studio.sound_enabled": "已启用 %d 个音效： %s",
   "fgmplus.studio.roundness": "圆度: %s%%",
-  "fgmplus.studio.roundness_tip": "0% = 原版方块形，100% = 全圆形；皮肤/外套/护甲全部一起变成超椭球面"
+  "fgmplus.studio.roundness_tip": "0% = 原版方块形，100% = 全圆形；皮肤/外套/护甲全部一起变成超椭球面",
+  "fgmplus.studio.cleavage_on": "乳沟桥接：开",
+  "fgmplus.studio.cleavage_off": "乳沟桥接：关",
+  "fgmplus.studio.cleavage_tip": "高圆度时把内侧向躯干中线桥接，两个曲面交叠成一条乳沟；关闭恢复纯椭球轮廓，FGM 的胸部间距滑条恢复原有效果"
 }

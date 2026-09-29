@@ -39,14 +39,14 @@ public class RoundMeshHarness {
         WildfireModelRenderer.ModelBox box = new WildfireModelRenderer.BreastModelBox(64, 64, 16, 17, -4F, 0F, 0F, 4, 5, 4, 0.0F, false);
         System.out.println("source quads=" + box.quads.length);
 
-        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F);
+        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F, true);
         int expected = expectedQuads(box);
         System.out.println("quadCount=" + mesh.quadCount + " expected=" + expected + " floats=" + mesh.data.length);
         check("nonempty-mesh", mesh.quadCount > 0 && mesh.data.length == mesh.quadCount * 32,
                 "quads=" + mesh.quadCount + " floats=" + mesh.data.length);
         check("quad-count-matches-faces", mesh.quadCount == expected, "quads=" + mesh.quadCount + " expected " + expected);
-        check("cache-stable", RoundBreastMesh.of(box, 0.85F) == mesh, "cache returned a fresh mesh");
-        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F) != mesh, "roundness change kept stale mesh");
+        check("cache-stable", RoundBreastMesh.of(box, 0.85F, true) == mesh, "cache returned a fresh mesh");
+        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F, true) != mesh, "roundness change kept stale mesh");
 
         //every vertex inside the source box envelope (anti-clip), every normal unit,
         //every UV inside the mapped atlas region of the source faces
@@ -101,6 +101,12 @@ public class RoundMeshHarness {
         //vertices land just short of it.
         check("cleavage-bridge", maxX > 0.5f / 16 && maxX <= 1.3f / 16,
                 "max world x=" + (maxX * 16) + "px (must cross the centerline plane x=0)");
+
+        //bridge-off toggle: the plain mesh keeps the pure superellipsoid (no crossing)
+        RoundBreastMesh plain = RoundBreastMesh.of(box, 0.85F, false);
+        float plainMaxX = Float.NEGATIVE_INFINITY;
+        for(int o = 0; o < plain.data.length; o += 8) plainMaxX = Math.max(plainMaxX, plain.data[o]);
+        check("bridge-off-stays-plain", plainMaxX <= 1e-4, "plain max x=" + (plainMaxX * 16) + "px");
 
         System.out.println(failures == 0 ? "ALL PASS" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);

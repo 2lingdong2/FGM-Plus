@@ -13,8 +13,12 @@ import io.netty.buffer.ByteBuf;
  * dragging right always protrudes. (The class doc on the 1.20.1 port wrongly
  * claimed positive = protrude; the render math below is authoritative.)
  * Roundness (0..1) morphs the flat 4x5x3 model box toward a superellipsoid; the
- * mesh deformation itself lives in the per-platform render layer.
- * Wire format: 8 floats, 32 bytes, carried in the fgmplus:shape_sync payload.
+ * mesh deformation itself lives in the per-platform render layer. Cleavage
+ * (default on) bridges the inner halves of the two rounds toward the torso
+ * centerline so the surfaces meet in a crease instead of a void; turning it
+ * off restores the plain superellipsoid and FGM's own separation slider feel.
+ * Wire format: 9 floats, 36 bytes, carried in the fgmplus:shape_sync payload
+ * (older readers consumed 8 and ignore the tail).
  */
 public final class ShapeData {
 
@@ -22,6 +26,10 @@ public final class ShapeData {
 	public static final float MIN_PERK = -30.0F, MAX_PERK = 60.0F;
 	public static final float MIN_OFFSET = -1.0F, MAX_OFFSET = 1.0F; //model units, 1.0 = 16 px
 	public static final float MIN_ROUNDNESS = 0.0F, MAX_ROUNDNESS = 1.0F; //0 = vanilla box, 1 = full sphere
+
+	//bridge-on is the shipped look (the accepted 1.6.0 re-release behavior); the
+	//Studio button flips it off per player
+	public static final float DEFAULT_CLEAVAGE = 1.0F;
 
 	private float scaleX = 1.0F;
 	private float scaleY = 1.0F;
@@ -31,6 +39,7 @@ public final class ShapeData {
 	private float offsetY = 0.0F;
 	private float offsetZ = 0.0F;
 	private float roundness = 0.0F;
+	private float cleavage = DEFAULT_CLEAVAGE;
 
 	private static float clamp(float value, float min, float max) {
 		return Math.max(min, Math.min(max, value));
@@ -102,10 +111,20 @@ public final class ShapeData {
 		this.roundness = clamp(value, MIN_ROUNDNESS, MAX_ROUNDNESS);
 	}
 
+	/** True when the inner halves of the two rounds bridge toward the torso centerline. */
+	public boolean isCleavage() {
+		return cleavage >= 0.5F;
+	}
+
+	public void setCleavage(boolean bridged) {
+		this.cleavage = bridged ? 1.0F : 0.0F;
+	}
+
 	/** True when every field is at its default; default shapes are never stored or worth syncing. */
 	public boolean isDefault() {
 		return scaleX == 1.0F && scaleY == 1.0F && scaleZ == 1.0F && perkiness == 0.0F
-				&& offsetX == 0.0F && offsetY == 0.0F && offsetZ == 0.0F && roundness == 0.0F;
+				&& offsetX == 0.0F && offsetY == 0.0F && offsetZ == 0.0F && roundness == 0.0F
+				&& cleavage == DEFAULT_CLEAVAGE;
 	}
 
 	public void write(ByteBuf buffer) {
@@ -117,6 +136,7 @@ public final class ShapeData {
 		buffer.writeFloat(offsetY);
 		buffer.writeFloat(offsetZ);
 		buffer.writeFloat(roundness);
+		buffer.writeFloat(cleavage);
 	}
 
 	public static ShapeData read(ByteBuf buffer) {
@@ -137,6 +157,10 @@ public final class ShapeData {
 		if(buffer.readableBytes() >= 4) {
 			shape.setRoundness(finite(buffer.readFloat(), 0.0F));
 		}
+		//cleavage joined together with the 4-platform sync; missing tail keeps the default
+		if(buffer.readableBytes() >= 4) {
+			shape.cleavage = finite(buffer.readFloat(), DEFAULT_CLEAVAGE);
+		}
 		return shape;
 	}
 
@@ -154,6 +178,7 @@ public final class ShapeData {
 		json.addProperty("offsetY", offsetY);
 		json.addProperty("offsetZ", offsetZ);
 		json.addProperty("roundness", roundness);
+		json.addProperty("cleavage", cleavage);
 		return json;
 	}
 
@@ -171,6 +196,7 @@ public final class ShapeData {
 		shape.setOffsetY(optFloat(json, "offsetY", 0.0F));
 		shape.setOffsetZ(optFloat(json, "offsetZ", 0.0F));
 		shape.setRoundness(optFloat(json, "roundness", 0.0F));
+		shape.cleavage = optFloat(json, "cleavage", DEFAULT_CLEAVAGE);
 		return shape;
 	}
 
@@ -193,6 +219,7 @@ public final class ShapeData {
 		copy.offsetY = this.offsetY;
 		copy.offsetZ = this.offsetZ;
 		copy.roundness = this.roundness;
+		copy.cleavage = this.cleavage;
 		return copy;
 	}
 }

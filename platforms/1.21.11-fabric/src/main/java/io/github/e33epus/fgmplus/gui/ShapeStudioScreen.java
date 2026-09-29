@@ -162,6 +162,18 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 					button.updateMessage();
 				})
 				.build());
+		//Cleavage bridge toggle: off restores the plain superellipsoid (and FGM's
+		//own separation slider feel) for players who prefer the previous look
+		this.addRenderableWidget(new WildfireButton.Builder()
+					.message(() -> Component.translatable(((ShapeHolder) resolvePlayer()).fgmplus$getShape().isCleavage() ? "fgmplus.studio.cleavage_on" : "fgmplus.studio.cleavage_off"))
+					.position(left, y + 96).size(FULL_WIDTH, FGM_BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable("fgmplus.studio.cleavage_tip")))
+				.onPress(button -> {
+					((ShapeHolder) resolvePlayer()).fgmplus$getShape().setCleavage(!((ShapeHolder) resolvePlayer()).fgmplus$getShape().isCleavage());
+					persist("cleavage", ((ShapeHolder) resolvePlayer()).fgmplus$getShape().isCleavage() ? 1.0F : 0.0F);
+					button.updateMessage();
+				})
+				.build());
 
 		super.init();
 	}
@@ -216,8 +228,8 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 		int y = this.height / 2;
 		//Same translucent panel style as FGM's customization tabs, sized over the grid
 		//(+1 on the bottom edge: fill's end is exclusive, and the wrapped status
-		//text's second line reaches y+112)
-		graphics.fill(x - 40, y - 32, x + 136, y + 113, PANEL_FILL);
+		//text's second line reaches y+134)
+		graphics.fill(x - 40, y - 32, x + 136, y + 135, PANEL_FILL);
 
 		//Title centered at FGM's wardrobe title height
 		graphics.drawString(this.font, this.title, x - this.font.width(this.title) / 2, y - 82, 0xFFFFFF, false);
@@ -237,7 +249,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 		int y = this.height / 2;
 		//Status text (loaded sound files) below the 15px button rows; can exceed the
 		//162 px panel (long file names), so wrap to at most two lines with a tail
-		int ly = y + 94;
+		int ly = y + 114;
 		for(String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, FULL_WIDTH - 4)) {
 			graphics.drawCenteredString(this.font, line, x + 48, ly, 0xE0E0E0);
 			ly += 10;

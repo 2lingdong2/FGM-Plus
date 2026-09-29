@@ -28,22 +28,22 @@ public class RoundMeshHarness {
         //exactly the box from GenderLayer.resizeBox: left breast, 4x5x3 at (-4,0,0)
         WildfireModelRenderer.ModelBox box = new WildfireModelRenderer.BreastModelBox(64, 64, -4F, 0F, 0F, 4, 5, 3, 0.0F, skin);
 
-        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F);
+        RoundBreastMesh mesh = RoundBreastMesh.of(box, 0.85F, true);
         System.out.println("quadCount=" + mesh.quadCount + " floats=" + mesh.data.length);
         check("nonempty-mesh", mesh.quadCount > 0 && mesh.data.length == mesh.quadCount * 32,
                 "quads=" + mesh.quadCount + " floats=" + mesh.data.length);
         //4x5x3 faces subdivided by GEOMETRIC edge length (not UV size): E(5x3)=15,
         //W(5x3)=15, D(4x3)=12, U(4x3)=12, N(4x5)=20 -> 74 quads
         check("quad-count-matches-faces", mesh.quadCount == 74, "quads=" + mesh.quadCount + " expected 74");
-        check("cache-stable", RoundBreastMesh.of(box, 0.85F) == mesh, "cache returned a fresh mesh");
-        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F) != mesh, "roundness change kept stale mesh");
+        check("cache-stable", RoundBreastMesh.of(box, 0.85F, true) == mesh, "cache returned a fresh mesh");
+        check("cache-invalidates", RoundBreastMesh.of(box, 0.5F, true) != mesh, "roundness change kept stale mesh");
 
         //every vertex inside the source box envelope (anti-clip), every normal unit
         boolean inside = true, unit = true;
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o], y = mesh.data[o + 1], z = mesh.data[o + 2];
             //box: x -4..0, y 0..5, z 0..3 px -> /16 world units
-            if(x < -4f / 16 - 1e-4 || x > 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 3f / 16 + 1e-4) {
+            if(x < -4f / 16 - 1e-4 || x > 1.3f / 16 + 1e-4 || y < -1e-4 || y > 5f / 16 + 1e-4 || z < -1e-4 || z > 3f / 16 + 1e-4) {
                 inside = false;
                 System.out.println("  outside vertex at " + o + ": " + x + "," + y + "," + z);
             }
@@ -62,10 +62,20 @@ public class RoundMeshHarness {
         float maxDist = 0f;
         for(int o = 0; o < mesh.data.length; o += 8) {
             float x = mesh.data[o] * 16 + 2, y = mesh.data[o + 1] * 16 - 2.5f, z = mesh.data[o + 2] * 16 - 1.5f;
+            if(x >= 0) continue; //bridged inner half is intentionally NOT the pure surface
             maxDist = Math.max(maxDist, (float) Math.sqrt(x * x / 4f + y * y / 6.25f + z * z / 2.25f));
         }
         float theory = (float) Math.sqrt(Math.pow(3, 1 - 2 * 0.85 / 2));
         check("curvature-applied", Math.abs(maxDist - theory) < 1e-3, "max=" + maxDist + " theory=" + theory);
+
+        //cleavage bridge: the bridged mesh's inner vertices must cross the torso
+        //centerline plane (world x = 0), while the plain (bridge-off) mesh must not
+        RoundBreastMesh plain = RoundBreastMesh.of(box, 0.85F, false);
+        float bridgedMaxX = Float.NEGATIVE_INFINITY, plainMaxX = Float.NEGATIVE_INFINITY;
+        for(int o = 0; o < mesh.data.length; o += 8) bridgedMaxX = Math.max(bridgedMaxX, mesh.data[o]);
+        for(int o = 0; o < plain.data.length; o += 8) plainMaxX = Math.max(plainMaxX, plain.data[o]);
+        check("cleavage-bridge", bridgedMaxX > 0.5f / 16 && bridgedMaxX <= 1.3f / 16 && plainMaxX <= 1e-4,
+                "bridged max x=" + (bridgedMaxX * 16) + "px plain max x=" + (plainMaxX * 16) + "px");
 
         //overlay-style layout: two degenerate faces must be skipped, not crash or emit
         UVLayout overlay = new UVLayout(
@@ -75,7 +85,7 @@ public class RoundMeshHarness {
                 new UVQuad(20, 42, 24, 45),
                 new UVQuad(20, 37, 24, 42));
         WildfireModelRenderer.ModelBox wear = new WildfireModelRenderer.OverlayModelBox(64, 64, -4F, 0F, 0F, 4, 5, 3, 0.0F, overlay);
-        RoundBreastMesh wearMesh = RoundBreastMesh.of(wear, 0.85F);
+        RoundBreastMesh wearMesh = RoundBreastMesh.of(wear, 0.85F, true);
         //null east + zero-uvs east quad: initQuads leaves quads[i] null for null UVQuad
         check("overlay-mesh-nonempty", wearMesh.quadCount > 0, "quads=" + wearMesh.quadCount);
 
