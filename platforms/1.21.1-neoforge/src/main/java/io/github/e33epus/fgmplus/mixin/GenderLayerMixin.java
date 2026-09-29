@@ -1,26 +1,27 @@
 package io.github.e33epus.fgmplus.mixin;
 
-
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.wildfire.main.GenderPlayer;
 import com.wildfire.main.WildfireGender;
+import com.wildfire.main.entitydata.PlayerConfig;
 import com.wildfire.render.GenderLayer;
 import com.wildfire.render.WildfireModelRenderer;
 import io.github.e33epus.fgmplus.render.RoundBreastMesh;
 import io.github.e33epus.fgmplus.shape.ShapeData;
 import io.github.e33epus.fgmplus.shape.ShapeHolder;
 import io.github.e33epus.fgmplus.shape.ShapeRenderState;
+import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -35,42 +36,47 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * positional terms at the vanilla cap level and applies a real scale to
  * the breast model instead, pivoting on the box corner that touches the chest.
  *
- * On top of that it layers the per-player ShapeData (three-axis scale + perkiness
- * + position offsets). Back overflow is cured by fp$flattenBack: every vertex
- * whose body-space z crosses the torso-back plane is pulled back onto it along
- * the body-z axis, so the back corner can never poke through while the front
- * fit stays exactly where the user put it. (The 1.2.x-1.3.5 translate-based
- * "recovery" aid is retired — it moved the whole box and broke the front fit.)
+ * <p>On top of that it layers the per-player ShapeData (three-axis scale + perkiness
+ * + position offsets + roundness). Back overflow is cured by fp$flattenBack: every
+ * vertex whose body-space z crosses the torso-back plane is pulled back onto it
+ * along the body-z axis, so the back corner can never poke through while the front
+ * fit stays exactly where the user put it.</p>
+ *
+ * <p>Call-site facts verified against the FGM 3.2.2 jar (mojmap-named, NeoForge
+ * production runtime uses the same namespace, so no refmap is needed):
+ * renderBreastWithTransforms has 24 params (the trailing boolean selects the
+ * jacket-wear box set); the PoseStack.scale(0.9995,1,1) fingerprint call sits
+ * right before the renderBreast call and the baby-scale call upstream is filtered
+ * by the fingerprint guard; the depth-sink translate is FFF-ordinal 3 and the
+ * hang-shift translate is FFF-ordinal 6, exactly as in FGM 3.1 (the baby block's
+ * bodyYOffset translate is (DDD)V and does not enter the ordinal count); all
+ * renderBox call sites (body, jacket-wear, armor layers, trim, glint) live inside
+ * renderBreast, which renderBreastWithTransforms invokes inside this capture
+ * window.</p>
  */
 @Mixin(GenderLayer.class)
 public abstract class GenderLayerMixin {
 
-    // Vanilla ClientConfiguration.BUST_SIZE upper bound
+    // Vanilla FloatConfigKey BUST_SIZE upper bound
     @Unique private static final float fp$VANILLA_BUST_CAP = 0.8F;
-    // GenderLayer#render passes breastSize = bSize + |bSize - 0.7|, which folds to a
-    // constant 0.7 for bSize <= 0.7 and is invertible above that
+    // GenderLayer#render passes breastSize = bSize + |bSize - 0.7| (verified identical
+    // in the 3.2.2 bytecode), which folds to a constant 0.7 for bSize <= 0.7 and is
+    // invertible above that
     @Unique private static final float fp$PARAM_FOLD = 0.7F;
     // Replaces the retired bustScaleGain/bustScaleMax config keys (same values as their defaults)
     @Unique private static final float fp$SCALE_GAIN = 1.0F;
     @Unique private static final float fp$SCALE_MAX = 3.0F;
     // Torso BACK clamp plane, in body space. Front = -z and back = +z (established
-    // empirically: the diagnostic panel at z = -2.25 px rendered on the chest front,
-    // and the 1.3.0 clip keeping z > -2.25 px cut away the front). The plane sits
-    // 0.125 px outside the vanilla torso back (+2 px) so flattened geometry neither
-    // z-fights the skin nor the jacket skin layer at +2.25 px. Vertices with a body
-    // z beyond it are pulled back onto the plane along the body-z axis
-    // ("flattened"), never clipped: front-side geometry is untouched, so the chest
-    // stays fitted to the front exactly as the user required.
-    //
-    // When it triggers (reviewer-recomputed, FGM 3.1 values): full vanilla slider
-    // (bust 0.8, folded size 0.9, droop -31.5 deg) tops out at +1.61 px static —
-    // inside the plane. FGM's true default (bust 0.6) sits at +2.04 px (+2.06 px
-    // with the breathing animation) — still inside. Smaller busts, the bounce
-    // animation's backward swing and large scaleZ/scaleY DO cross the plane —
-    // and those are exactly the configurations where the vanilla geometry already
-    // pokes out of the back, i.e. precisely what flattening is here to cure.
+    // empirically on the 3.1 render lineage and re-derived from the 3.2.2 bytecode:
+    // the depth-sink translate pushes +z with growing bust). The plane sits 0.125 px
+    // outside the vanilla torso back (+2 px) so flattened geometry neither z-fights
+    // the skin nor the jacket skin layer at +2.25 px. Vertices with a body z beyond
+    // it are pulled back onto the plane along the body-z axis ("flattened"), never
+    // clipped: front-side geometry is untouched, so the chest stays fitted to the
+    // front exactly as the user required.
     @Unique private static final float fp$CLAMP_BACK_Z = 2.125F * 0.0625F;
-    // FGM's droop: -35 deg times totalRotation (totalRotation is clamped to min(breastSize + 0.2, 1))
+    // FGM's droop: -35 deg times totalRotation (verified: rotationXYZ(-35 * totalRot)
+    // right before the scale call)
     @Unique private static final float fp$DROOP_DEG = 35.0F;
 
     @Unique private float fp$breastSize;
@@ -78,24 +84,19 @@ public abstract class GenderLayerMixin {
     @Unique private float fp$zOff;
     @Unique private ShapeData fp$shape;
 
-    // Diagnostic back-plane state, written in fp$captureSize and consumed (and
-    // nulled) by fp$drawDebugPlane at TAIL. Static because the TAIL handler for
-    // the static-friendly capture chain mirrors the previous clip design; the
-    // same entry pose + body transform is what the upcoming back-flatten vertex
-    // clamp will be validated against.
-    //Body view (entry pose + body-part transform) and its inverse, both built once
-    //per breast per frame in fp$captureSize; fp$flattenBack clamps against the
+    //Body view (entry pose + baby/body-part transform) and its inverse, both built
+    //once per breast per frame in fp$captureSize; fp$flattenBack clamps against the
     //inverse, fp$drawDebugPlane lifts the panel through the forward one. Both are
-    //nulled at the capture-window TAIL; null = outside the window -> vanilla path
+    //nulled at the capture-window TAIL; null = outside the window -> vanilla path.
+    //Static because renderBox is static.
     @Unique private static Matrix4f fp$bodyView;
     @Unique private static Matrix4f fp$bodyViewInv;
+    //Roundness of the shape captured for the current window (renderBox is static,
+    //so the instance shape field is mirrored here)
+    @Unique private static float fp$roundness;
     //0-based renderBox call index inside the current capture window (body, then
     //jacket-wear, then armor passes); reset per breast in fp$captureSize
     @Unique private static int fp$boxIndex;
-    //Per-player roundness for the current capture window (0 = vanilla flat box ->
-    //fp$flattenBack stays bit-identical to FGM's render); read in fp$flattenBack
-    //to swap the flat quad emission for the superellipsoid mesh
-    @Unique private static volatile float fp$roundness;
 
     @Unique private static float fp$realScale(float param) {
         float bSize = param > fp$PARAM_FOLD ? (param + fp$PARAM_FOLD) * 0.5F : param;
@@ -105,29 +106,38 @@ public abstract class GenderLayerMixin {
         return Math.min(1.0F + (bSize - fp$VANILLA_BUST_CAP) * fp$SCALE_GAIN, fp$SCALE_MAX);
     }
 
+    //Parameter list mirrors the 3.2.2 descriptor exactly:
+    //(LivingEntity, HumanoidModel, ItemStack, PoseStack, MultiBufferSource, RenderType,
+    // int light, int overlay, float alpha, boolean bounceEnabled,
+    // float totalX, float totalY, float bounceRotation, float breastSize,
+    // float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff,
+    // float outwardAngle, boolean uniboob, boolean airGate, boolean chestplateOccupied,
+    // boolean left, boolean jacketWear)
     @Inject(method = "renderBreastWithTransforms", at = @At("HEAD"), require = 1, remap = false)
-    private void fp$captureSize(AbstractClientPlayer entity, ModelPart body, ItemStack armorStack, PoseStack matrixStack, MultiBufferSource bufferSource,
-        RenderType breastRenderType, int packedLightIn, int combineTex, float alpha, boolean bounceEnabled, float totalX, float total, float bounceRotation,
-        float breastSize, float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff, float outwardAngle, boolean uniboob, boolean isChestplateOccupied,
-        boolean breathingAnimation, boolean left, CallbackInfo ci) {
+    private void fp$captureSize(LivingEntity entity, HumanoidModel<?> model, ItemStack armorStack, PoseStack matrixStack, MultiBufferSource bufferSource,
+        RenderType breastRenderType, int packedLightIn, int packedOverlayIn, float alpha, boolean bounceEnabled, float totalX, float totalY,
+        float bounceRotation, float breastSize, float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff, float outwardAngle,
+        boolean uniboob, boolean airGate, boolean chestplateOccupied, boolean left, boolean jacketWear, CallbackInfo ci) {
         fp$breastSize = breastSize;
         fp$breastOffsetZ = breastOffsetZ;
         fp$zOff = zOff;
         //Same lookup GenderLayer#render does; the shape is only read when a breast is actually rendered
         fp$shape = null;
-        GenderPlayer plr = WildfireGender.getPlayerById(entity.getUUID());
+        fp$roundness = 0.0F;
+        PlayerConfig plr = WildfireGender.getPlayerById(entity.getUUID());
         if (plr != null) {
-            fp$shape = ((ShapeHolder) plr).fgmplus$getShape();
+            ShapeData shape = ((ShapeHolder) plr).fgmplus$getShape();
+            fp$shape = shape;
+            fp$roundness = shape.getRoundness();
         }
-        fp$roundness = fp$shape != null ? fp$shape.getRoundness() : 0.0F;
-        //Body view = entry pose (the stack is untouched at HEAD) + the body-part
-        //transform FGM applies right after (GenderLayer source:
+        //Body view = entry pose (the stack is untouched at HEAD) + the transforms FGM
+        //applies right after (verified in the 3.2.2 bytecode: optional baby
+        //scale(1/babyBodyScale) + translate(0, bodyYOffset/16, 0), then
         //translate(body.xyz * 0.0625) then guarded zRot/yRot/xRot mulPose). Two
         //consumers inside the capture window: fp$flattenBack (the back-flatten
         //clamp, always on) clamps against the inverse, and fp$drawDebugPlane lifts
-        //the torso-back plane through the forward view. Both were proven in-game:
-        //the user confirmed the panel hugs the torso back from every angle.
-        //The GenderPlayer lookup above is load-bearing for the redirects and stays
+        //the torso-back plane through the forward one.
+        //The PlayerConfig lookup above is load-bearing for the redirects and stays
         //unconditional; the capture itself must be unconditional too (the clamp
         //depends on it regardless of the diagnostic toggle)
         fp$boxIndex = 0;
@@ -135,6 +145,16 @@ public abstract class GenderLayerMixin {
         fp$bodyViewInv = null;
         try {
             Matrix4f view = new Matrix4f(matrixStack.last().pose());
+            if (entity.isBaby()) {
+                //babyBodyScale/bodyYOffset are private final on AgeableListModel in
+                //1.21.1 (FGM reads them through its own accesstransformer.cfg) —
+                //this accessor keeps the access mixin-local
+                AgeableListModelAccessor modelAccess = (AgeableListModelAccessor) model;
+                float s = 1.0F / modelAccess.fgmplus$babyBodyScale();
+                view.scale(s, s, s);
+                view.translate(0.0F, modelAccess.fgmplus$bodyYOffset() / 16.0F, 0.0F);
+            }
+            ModelPart body = model.body;
             view.translate(body.x * 0.0625F, body.y * 0.0625F, body.z * 0.0625F);
             view.rotateZ(body.zRot);
             view.rotateY(body.yRot);
@@ -150,8 +170,9 @@ public abstract class GenderLayerMixin {
     @Redirect(method = "renderBreastWithTransforms", require = 1, remap = false,
         at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;scale(FFF)V", remap = true))
     private void fp$applyRealScale(PoseStack stack, float x, float y, float z) {
-        //Fingerprint guard: vanilla's z-fighting fix is scale(0.9995,1,1) at this point;
-        //any other signature means upstream changed the call site order - stand down
+        //Fingerprint guard: FGM's z-fighting fix is scale(0.9995,1,1) at this point;
+        //any other signature (e.g. the baby scale upstream) means a different call
+        //site - stand down
         if (Math.abs(x - 0.9995F) > 1.0e-4F || y != 1.0F || z != 1.0F) {
             stack.scale(x, y, z);
             return;
@@ -164,18 +185,16 @@ public abstract class GenderLayerMixin {
         if (perk != 0.0F) {
             stack.mulPose(new Quaternionf().rotationXYZ(perk * Mth.DEG_TO_RAD, 0.0F, 0.0F));
         }
-        //No recovery translate anymore: the translate-based aid (retired in 1.4.0)
-        //moved the whole box toward the chest front, which broke the front fit the
-        //user explicitly wants. Back overflow is now handled per-vertex by
-        //fp$flattenBack, which leaves the front side untouched.
-        //Each breast box already spans the full half-torso width, so the real-scale
-        //growth (s) never applies to the X axis by default; the per-player scaleX
-        //slider is the only way to widen (1.0 = vanilla width)
+        //Back overflow is handled per-vertex by fp$flattenBack, which leaves the front
+        //side untouched. Each breast box already spans the full half-torso width, so
+        //the real-scale growth (s) never applies to the X axis by default; the
+        //per-player scaleX slider is the only way to widen (1.0 = vanilla width)
         stack.scale(x * shape.getScaleX(), y * s * shape.getScaleY(), z * s * shape.getScaleZ());
     }
 
-    //4th translate call: the positional sink that deepens with bust size
-    //(zOff = 0.0625 * (1 - bSize)); freeze it at the vanilla cap level
+    //FFF-ordinal 3: the positional sink that deepens with bust size
+    //(zOff - 0.125 + breastOffsetZ * 0.0625, verified in the 3.2.2 bytecode);
+    //freeze it at the vanilla cap level
     @Redirect(method = "renderBreastWithTransforms", require = 1, remap = false,
         at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V", ordinal = 3, remap = true))
     private void fp$freezeDepthSink(PoseStack stack, float x, float y, float z) {
@@ -196,8 +215,9 @@ public abstract class GenderLayerMixin {
             zOff - 0.0625F * 2F + fp$breastOffsetZ * 0.0625F + shape.getOffsetZ());
     }
 
-    //7th translate call: the hang shift that keeps growing with bust size
-    //(-0.035 * breastSize); clamp the size term at its vanilla cap level
+    //FFF-ordinal 6: the hang shift that keeps growing with bust size
+    //(-0.035 * breastSize, verified in the 3.2.2 bytecode); clamp the size term
+    //at its vanilla cap level
     @Redirect(method = "renderBreastWithTransforms", require = 1, remap = false,
         at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V", ordinal = 6, remap = true))
     private void fp$freezeHangShift(PoseStack stack, float x, float y, float z) {
@@ -211,32 +231,25 @@ public abstract class GenderLayerMixin {
     }
 
     /**
-     * The back-flatten clamp ("削平背端"): replaces FGM's renderBox with a
-     * vertex-clamped version. Every vertex whose body-space z lies beyond
-     * fp$CLAMP_BACK_Z is pulled straight back onto the plane along the body-z
-     * axis; everything in front of the plane is bit-identical to the original
-     * render. UVs, normals, light and overlay pass through untouched, so the
-     * flattened region simply reads as squashed against the back instead of
-     * poking out of it. This is the user's "削平" design: the box keeps its
-     * front fit while its back corner can never cross the torso back.
+     * The back-flatten clamp + Shape Studio roundness emitter. Replaces FGM's
+     * renderBox with a vertex-processed version:
+     *  - roundness 0: every vertex whose body-space z lies beyond fp$CLAMP_BACK_Z is
+     *    pulled straight back onto the plane along the body-z axis; everything in
+     *    front of the plane is bit-identical to the original render.
+     *  - roundness > 0: the superellipsoid mesh ({@link RoundBreastMesh}) is emitted
+     *    instead of the flat box quads, then the same clamp applies — from the
+     *    clamp's point of view a mesh vertex is just another local-space point.
+     * UVs, color, light and overlay pass through untouched. All renderBox call
+     * sites (breast, jacket-wear, armor incl. trim/glint) are processed together so
+     * outer layers follow the body instead of poking through it. Outside the
+     * capture window the original render runs.
      *
-     * <p>When the capture window carries a nonzero roundness, the flat quads are
-     * replaced outright by {@link RoundBreastMesh}'s superellipsoid mesh (same
-     * subdivision for every pass, so skin/jacket/armor morph together); the
-     * back-flatten clamp then applies to the mesh vertices exactly as to box
-     * vertices. Roundness 0 skips this branch entirely — the flat path below is
-     * bit-identical to FGM's renderBox emission.</p>
-     *
-     * Body-space mapping uses the verified chain from fp$captureSize (same lift
-     * the diagnostic panel renders). Only the z excursion is clamped — x/y stay
-     * put, so the silhouette from the front does not change. All six renderBox
-     * call sites (breast, jacket-wear, armor incl. overlay/trim/glint) are
-     * flattened together so outer layers follow the body instead of poking
-     * through it. Outside the capture window the original render runs.
+     * <p>3.2.2 signature: (ModelBox, PoseStack, VertexConsumer, int light,
+     * int overlay, int colorARGB) — color is a packed int in this generation.</p>
      */
     @Inject(method = "renderBox", at = @At("HEAD"), cancellable = true, require = 1, remap = false)
     private static void fp$flattenBack(WildfireModelRenderer.ModelBox model, PoseStack matrixStack, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn,
-        float red, float green, float blue, float alpha, CallbackInfo ci) {
+        int color, CallbackInfo ci) {
         Matrix4f bodyView = fp$bodyView;
         Matrix4f bodyInv = fp$bodyViewInv;
         if (bodyView == null || bodyInv == null) {
@@ -254,37 +267,39 @@ public abstract class GenderLayerMixin {
         //direction). Using the un-normalized linear part keeps everything affine
         //and scale-consistent: p' = p + (0,0,Δ) maps back to q' = q + R·(0,0,Δ)
         Vector3f pullDir = bodyView.transformDirection(new Vector3f(0.0F, 0.0F, 1.0F));
-        if (fp$roundness > 0.0F) {
+        float roundness = fp$roundness;
+        if (roundness > 0.0F) {
             //Shape Studio roundness: emit the superellipsoid mesh instead of the flat
-            //box quads. Same back-flatten clamp applies afterwards — from here on a
-            //mesh vertex is just another local-space point like a box vertex
-            RoundBreastMesh mesh = RoundBreastMesh.of(model, fp$roundness);
+            //box quads, then clamp exactly like the flat path
+            RoundBreastMesh mesh = RoundBreastMesh.of(model, roundness);
             float[] d = mesh.data;
             for (int quad = 0; quad < mesh.quadCount; quad++) {
                 for (int v = 0; v < 4; v++) {
                     int o = quad * 32 + v * 8;
-                    Vector3f view = pose.transformPosition(new Vector3f(d[o], d[o + 1], d[o + 2]));
-                    Vector3f body = bodyInv.transformPosition(new Vector3f(view));
+                    Vector4f viewPos = new Vector4f(d[o], d[o + 1], d[o + 2], 1.0F).mul(pose);
+                    Vector3f body = bodyInv.transformPosition(new Vector3f(viewPos.x(), viewPos.y(), viewPos.z()));
                     if (body.z > planeZ) {
                         float depth = body.z - planeZ;
-                        view.x -= pullDir.x * depth;
-                        view.y -= pullDir.y * depth;
-                        view.z -= pullDir.z * depth;
+                        viewPos.x -= pullDir.x * depth;
+                        viewPos.y -= pullDir.y * depth;
+                        viewPos.z -= pullDir.z * depth;
                     }
                     Vector3f normal = new Vector3f(d[o + 3], d[o + 4], d[o + 5]).mul(normalMat);
-                    bufferIn.vertex(view.x, view.y, view.z);
-                    bufferIn.color(red, green, blue, alpha);
-                    bufferIn.uv(d[o + 6], d[o + 7]);
-                    bufferIn.overlayCoords(packedOverlayIn);
-                    bufferIn.uv2(packedLightIn);
-                    bufferIn.normal(normal.x(), normal.y(), normal.z());
-                    bufferIn.endVertex();
+                    bufferIn.addVertex(viewPos.x(), viewPos.y(), viewPos.z());
+                    bufferIn.setColor(color);
+                    bufferIn.setUv(d[o + 6], d[o + 7]);
+                    bufferIn.setOverlay(packedOverlayIn);
+                    bufferIn.setLight(packedLightIn);
+                    bufferIn.setNormal(normal.x(), normal.y(), normal.z());
                 }
             }
             ci.cancel();
             return;
         }
         for (WildfireModelRenderer.TexturedQuad quad : model.quads) {
+            if (quad == null) {
+                continue;
+            }
             Vector3f normal = new Vector3f(quad.normal.getX(), quad.normal.getY(), quad.normal.getZ());
             normal.mul(normalMat);
             WildfireModelRenderer.PositionTextureVertex[] verts = quad.vertexPositions;
@@ -295,18 +310,17 @@ public abstract class GenderLayerMixin {
                 Vector3f view = pose.transformPosition(new Vector3f(lx, ly, lz));
                 Vector3f body = bodyInv.transformPosition(new Vector3f(view));
                 if (body.z > planeZ) {
-                    float d = body.z - planeZ;
-                    view.x -= pullDir.x * d;
-                    view.y -= pullDir.y * d;
-                    view.z -= pullDir.z * d;
+                    float dpt = body.z - planeZ;
+                    view.x -= pullDir.x * dpt;
+                    view.y -= pullDir.y * dpt;
+                    view.z -= pullDir.z * dpt;
                 }
-                bufferIn.vertex(view.x, view.y, view.z);
-                bufferIn.color(red, green, blue, alpha);
-                bufferIn.uv(vertex.texturePositionX(), vertex.texturePositionY());
-                bufferIn.overlayCoords(packedOverlayIn);
-                bufferIn.uv2(packedLightIn);
-                bufferIn.normal(normal.x(), normal.y(), normal.z());
-                bufferIn.endVertex();
+                bufferIn.addVertex(view.x, view.y, view.z);
+                bufferIn.setColor(color);
+                bufferIn.setUv(vertex.texturePositionX(), vertex.texturePositionY());
+                bufferIn.setOverlay(packedOverlayIn);
+                bufferIn.setLight(packedLightIn);
+                bufferIn.setNormal(normal.x(), normal.y(), normal.z());
             }
         }
         ci.cancel();
@@ -316,19 +330,17 @@ public abstract class GenderLayerMixin {
      * Diagnostic aid: draws the torso-back plane exactly as FGM Plus computes it
      * (the same chain fp$flattenBack clamps against), so its in-game fit can be
      * re-verified any time via the Shape Studio toggle. Vertices are submitted
-     * in body-space local coordinates through the lifted body view — the same
-     * structure FGM itself uses (vertex(pose, local)) — so there is no
-     * double- or missing-transform ambiguity.
+     * in body-space local coordinates through the lifted body view.
      *
      * Runs at TAIL, i.e. after FGM's popPose with no early returns upstream,
      * so the buffer source is live and the captured entry pose matches the
      * stack state the body transform was applied on top of.
      */
     @Inject(method = "renderBreastWithTransforms", at = @At("TAIL"), require = 1, remap = false)
-    private void fp$drawDebugPlane(AbstractClientPlayer entity, ModelPart body, ItemStack armorStack, PoseStack matrixStack, MultiBufferSource bufferSource,
-        RenderType breastRenderType, int packedLightIn, int combineTex, float alpha, boolean bounceEnabled, float totalX, float total, float bounceRotation,
-        float breastSize, float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff, float outwardAngle, boolean uniboob, boolean isChestplateOccupied,
-        boolean breathingAnimation, boolean left, CallbackInfo ci) {
+    private void fp$drawDebugPlane(LivingEntity entity, HumanoidModel<?> model, ItemStack armorStack, PoseStack matrixStack, MultiBufferSource bufferSource,
+        RenderType breastRenderType, int packedLightIn, int packedOverlayIn, float alpha, boolean bounceEnabled, float totalX, float totalY,
+        float bounceRotation, float breastSize, float breastOffsetX, float breastOffsetY, float breastOffsetZ, float zOff, float outwardAngle,
+        boolean uniboob, boolean airGate, boolean chestplateOccupied, boolean left, boolean jacketWear, CallbackInfo ci) {
         //Consume the capture window: a frame without a capture must not draw a stale
         //plane, and boxes after this point run the vanilla path
         Matrix4f bodyView = fp$bodyView;
@@ -341,11 +353,9 @@ public abstract class GenderLayerMixin {
             return;
         }
         //Torso BACK plane: front = -z and back = +z (established empirically — the
-        //first panel version at z = -2.25 px rendered on the chest FRONT per user
-        //measurement, and the 1.3.0 clip keeping z > -2.25 px cut away the front).
-        //The panel sits 0.25 px outside the torso back (z = +2.25 px) so it stays
-        //visible beside the skin instead of z-fighting with it; full torso
-        //silhouette x = +-4 px, y = 0..12 px in body space
+        //panel sits 0.25 px outside the torso back so it stays visible beside the
+        //skin instead of z-fighting with it; full torso silhouette x = +-4 px,
+        //y = 0..12 px in body space)
         float backZ = 2.25F * 0.0625F;
         float xHalf = 4.0F * 0.0625F;
         float yTop = 0.0F;
@@ -367,9 +377,8 @@ public abstract class GenderLayerMixin {
 
     @Unique
     private static void fp$debugVertex(VertexConsumer buffer, Matrix4f bodyView, float x, float y, float z) {
-        buffer.vertex(bodyView, x, y, z);
-        buffer.color(0.2F, 1.0F, 0.4F, 0.35F);
-        buffer.endVertex();
+        buffer.addVertex(bodyView, x, y, z);
+        buffer.setColor(0.2F, 1.0F, 0.4F, 0.35F);
     }
 
 }

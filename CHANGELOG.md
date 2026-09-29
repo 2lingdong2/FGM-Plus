@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.6.0
+
+**新增**
+
+- **胸部圆度同步 Forge 1.20.1**：1.5.0 在 Fabric 端推出的圆度滑条补齐 Forge 端——同一份造型数据、同一个 0–100% 连续变形（平直盒形 → 超椭球面），实现层按 FGM 3.1 的立即渲染管线重写（`renderBox` 静态窗口传圆度、`endVertex` 分离式顶点链）；`roundness=0` 时渲染路径与 1.4.1 位相同
+- **两个新平台：NeoForge 1.21.1 与 Fabric 1.21.1**（上游依赖 FGM **3.2.2** / **3.2.1+1.21**，ModDevGradle 2.0.147 / Fabric Loom）：1.6.0 全功能移植——胸围拓宽（bustSizeMax 默认 4.0 = 500%）、造型工作室（三轴缩放/位置/挺拔度/圆度 + 受伤音效）、圆度渲染（3.2.x 是 3.1 血统的立即渲染：`GenderPlayer`→`PlayerConfig`、armor 拆分 `GenderArmorLayer`、capture 移至 `setupTransformations`）；NeoForge 用 `AddPackFindersEvent` 注入音效包，Fabric 1.21.1 的形状同步沿用独立 `fgmplus:shape_sync` 通道
+- 目标矩阵扩至四端：`1.20.1-forge`、`1.21.1-neoforge`、`1.21.1-fabric`、`1.21.11-fabric`，全部 buildable，产物同挂 1.6.0
+
+**修复**
+
+- NeoForge 1.21.1 形状同步收紧：服务端只接受**声明为发送者本人 UUID** 的造型负载（镜像 FGM 自己 `ServerboundSyncPacket#handle` 的校验），并改为**立即向 tracking 玩家广播**（原来要等对方重新 StartTracking 才刷新，多人下造型更新不可见）
+
+**Fixed**
+
+- NeoForge 1.21.1 shape sync hardened: the server now only accepts a payload claiming the sender's own UUID (mirroring FGM's own `ServerboundSyncPacket#handle` validation) and **immediately rebroadcasts to tracking players** (previously an update only reached others after a re-StartTracking, making shape edits invisible in multiplayer)
+
+**Added**
+
+- **Breast roundness on Forge 1.20.1**: the roundness slider introduced on Fabric in 1.5.0 now covers Forge — same shape data, same 0–100% continuous morph (flat box → superellipsoid), reimplemented on FGM 3.1's immediate render pipeline (static window carrying roundness into `renderBox`, separated `endVertex` chain); `roundness=0` keeps the 1.4.1 path bit-identical
+- **Two new platforms: NeoForge 1.21.1 and Fabric 1.21.1** (upstream FGM **3.2.2** / **3.2.1+1.21**, ModDevGradle 2.0.147 / Fabric Loom): full 1.6.0 feature port — bust slider widening (bustSizeMax default 4.0 = 500%), the Shape Studio (three-axis scale / offsets / perkiness / roundness + hurt sounds), and roundness rendering (3.2.x is 3.1-lineage immediate rendering: `GenderPlayer`→`PlayerConfig`, armor split into `GenderArmorLayer`, capture moved to `setupTransformations`); NeoForge injects the hurt-sound pack via `AddPackFindersEvent`, Fabric 1.21.1 rides the standalone `fgmplus:shape_sync` channel
+- The target matrix grows to four: `1.20.1-forge`, `1.21.1-neoforge`, `1.21.1-fabric`, `1.21.11-fabric` — all buildable, all shipping 1.6.0
+
 ## v1.5.0
 
 **新增**

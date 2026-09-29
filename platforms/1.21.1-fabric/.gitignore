@@ -1,0 +1,3 @@
+# offline probe build artifacts (the probe .java sources are committed)
+_probe/lib/
+_probe/out/

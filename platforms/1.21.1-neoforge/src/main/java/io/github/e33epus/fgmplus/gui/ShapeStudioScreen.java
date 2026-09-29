@@ -1,11 +1,10 @@
 package io.github.e33epus.fgmplus.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.wildfire.gui.WildfireButton;
 import com.wildfire.gui.WildfireSlider;
 import com.wildfire.gui.screen.BaseWildfireScreen;
-import com.wildfire.main.GenderPlayer;
 import com.wildfire.main.WildfireGender;
+import com.wildfire.main.entitydata.PlayerConfig;
 import io.github.e33epus.fgmplus.FgmPlusMod;
 import io.github.e33epus.fgmplus.shape.ShapeData;
 import io.github.e33epus.fgmplus.shape.ShapeHolder;
@@ -14,7 +13,6 @@ import io.github.e33epus.fgmplus.shape.ShapeStore;
 import io.github.e33epus.fgmplus.sound.HurtSoundManager;
 import java.util.Locale;
 import java.util.UUID;
-import javax.annotation.Nonnull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,9 +23,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * Per-player breast shape editor (three-axis scale + perkiness + offsets).
- * Mirrors FGM's breast customization screen: a translucent panel on the
- * right and a large live preview of the actual player on the left.
+ * Per-player breast shape editor (three-axis scale + perkiness + offsets +
+ * roundness). Mirrors FGM's breast customization screen: a translucent panel on
+ * the right and a large live preview of the actual player on the left.
+ *
+ * <p>1.21.1 notes: Screen#render calls renderBackground itself, so render()
+ * must NOT call it again; renderBackground carries the (GuiGraphics, int, int,
+ * float) signature and vanilla's default just dims (the blur-every-frame change
+ * is 1.21.2+). FGM 3.2.2's WildfireButton/WildfireSlider keep the plain
+ * constructor API.</p>
  */
 public class ShapeStudioScreen extends BaseWildfireScreen {
 
@@ -53,7 +57,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         int bx = this.width / 2 + 30;
 
         //Initial slider positions only; callbacks re-resolve the player so edits
-        //always land on the live CLOTHING_PLAYERS entry, never a captured reference
+        //always land on the live CACHED entry, never a captured reference
         ShapeData shape = ((ShapeHolder) resolvePlayer()).fgmplus$getShape();
 
         this.addRenderableWidget(new WildfireButton(this.width / 2 + 174, y - 81, 9, 9, Component.literal("X"),
@@ -108,16 +112,19 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
                 value -> Component.translatable("fgmplus.studio.perkiness", String.format(Locale.ROOT, "%+.0f", value)),
                 value -> persist("perkiness", value)));
 
+        //Roundness: 0 = FGM's flat box (the "triangle" silhouette), 1 = full
+        //superellipsoid; displayed as a percentage. Syncs to everyone like the
+        //rest of the shape payload
         WildfireSlider roundness = this.roundnessSlider = new WildfireSlider(bx, y + 28, 158, 20,
                 ShapeData.MIN_ROUNDNESS, ShapeData.MAX_ROUNDNESS, shape.getRoundness(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setRoundness(value),
-                value -> Component.translatable("fgmplus.studio.roundness", String.format(Locale.ROOT, "%.0f", value * 100F)),
+                value -> Component.translatable("fgmplus.studio.roundness", String.format(Locale.ROOT, "%.0f", value * 100f)),
                 value -> persist("roundness", value));
         roundness.setTooltip(Tooltip.create(Component.translatable("fgmplus.studio.roundness_tip")));
         this.addRenderableWidget(roundness);
 
         //Custom hurt sound controls; every *.ogg in the folder plays (random pick,
-        //same as FGM's own two damage oggs). Preview plays instantly when the loaded
+        //same as FGM's own damage oggs). Preview plays instantly when the loaded
         //set matches the directory and only chains a full resource reload when the
         //files changed, so newly dropped/renamed files are picked up without restart
         this.hurtSoundStatus = HurtSoundManager.getStatusText();
@@ -157,67 +164,66 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         this.hurtSoundStatus = HurtSoundManager.getStatusText();
     }
 
-    private GenderPlayer resolvePlayer() {
-        GenderPlayer plr = WildfireGender.getPlayerById(this.playerUUID);
+    private PlayerConfig resolvePlayer() {
+        PlayerConfig plr = WildfireGender.getPlayerById(this.playerUUID);
         //getPlayerById returns null when no entry exists yet
         return plr != null ? plr : WildfireGender.getOrAddPlayerById(this.playerUUID);
     }
 
     private void persist(String key, float value) {
-        GenderPlayer plr = resolvePlayer();
+        PlayerConfig plr = resolvePlayer();
         if (plr == null) {
             //No FGM entry yet: persisting a default shape here would DELETE the
             //player's saved shape file (ShapeStore deletes on isDefault)
             return;
         }
         ShapeStore.save(this.playerUUID, ((ShapeHolder) plr).fgmplus$getShape());
-        //FGM's own tick loop detects this flag and sends the C2S sync packet
+        //FGM's own tick loop detects this flag and sends the C2S sync packet;
+        //the shape payload piggybacks on that send (WildfireSyncClientMixin)
         plr.needsSync = true;
         //Observability for the "slider edits stop applying" report class
         FgmPlusMod.LOGGER.debug("FGM Plus shape edit: uuid={}, {}={}", this.playerUUID, key, value);
     }
 
     @Override
-    public void renderBackground(@Nonnull GuiGraphics graphics) {
-        super.renderBackground(graphics);
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderBackground(graphics, mouseX, mouseY, partialTick);
         //Same translucent panel style as FGM's breast customization screen: a fill
         //on the right, the world and the actual player stay visible on the left
         int x = this.width / 2;
         int y = this.height / 2;
-        graphics.fill(x + 28, y - 85, x + 190, y + 98, 0x55000000);
+        graphics.fill(x + 28, y - 85, x + 190, y + 113, 0x55000000);
         graphics.fill(x + 29, y - 84, x + 189, y - 60, 0x55000000);
     }
 
     @Override
-    public void render(@Nonnull GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        renderBackground(graphics);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
+        //NO manual renderBackground here: vanilla Screen#render already calls it on 1.21.1
         super.render(graphics, mouseX, mouseY, delta);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 
         int x = this.width / 2;
         int y = this.height / 2;
         graphics.drawString(this.font, this.title, x + 32, y - 81, 0xFFFFFF, false);
 
-        //Large live preview of the actual player, same call and anchor as FGM's
-        //breast customization screen; the model renders through the same
+        //Large live preview of the actual player, same call shape and left-half
+        //anchor as FGM's wardrobe screen; the model renders through the same
         //GenderLayer pipeline, so live slider edits show up here
         if (this.minecraft != null && this.minecraft.level != null) {
             Player ent = this.minecraft.level.getPlayerByUUID(this.playerUUID);
             if (ent != null) {
-                InventoryScreen.renderEntityInInventoryFollowsMouse(graphics, x - 102, y + 275, 200, -20, -20, ent);
+                InventoryScreen.renderEntityInInventoryFollowsMouse(graphics,
+                        x - 164, y - 80, x, y + 80, 45, 0.0F, mouseX, mouseY, ent);
             }
         }
 
         int cx = x + 109; //center of the translucent panel (x+28..x+190)
         //Status text can exceed the 162 px panel (long file names); wrap it to the
         //panel width, at most two lines with an ellipsis tail
-        int ly = y + 88;
+        int ly = y + 92;
         for (String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, 150)) {
             graphics.drawCenteredString(this.font, line, cx, ly, 0xE0E0E0);
             ly += 10;
         }
-        //The old "Auto-fit" recovery indicator is gone with the retired recovery
-        //translate; back overflow is flattened per-vertex by the clamp since 1.4.0
     }
 
     /** Greedy character-wrap to at most {@code maxLines} lines of {@code maxWidth} px. */

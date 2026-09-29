@@ -12,3 +12,14 @@ ref/
 # offline probe build artifacts (the probe .java sources are committed)
 platforms/1.21.11-fabric/_probe/lib/
 platforms/1.21.11-fabric/_probe/out/
+
+# offline probe binaries/evidence (probe .java sources are committed)
+platforms/*/_probe/lib/
+platforms/*/_probe/out/
+platforms/*/_probe/stub/
+platforms/*/_probe/jar/
+platforms/*/_probe/nf/
+platforms/*/_probe/*.jar
+platforms/*/_probe/*.args
+platforms/*/_probe/*.txt
+*.javap

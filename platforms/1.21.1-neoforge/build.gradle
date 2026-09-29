@@ -1,0 +1,84 @@
+// FGM Plus — NeoForge / MC 1.21.1 target (upstream Female Gender Mod 3.2.2)
+//
+// ModDevGradle 2.x: Mojang official mappings are native (no mappings block),
+// and the dev runtime ships mojmap names just like NeoForge production, so the
+// mixin set needs NO refmap / annotation processor — every literal name in the
+// mixin annotations already matches the runtime namespace on both sides.
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+
+// 共享层装配：读仓库级身份 + 把 shared/ 与本目标挂载的层接进源集。
+// 判定依据在 versions/targets.json，本平台不做任何目标名硬编码。
+apply from: '../../gradle/fgmplus-layers.gradle'
+
+version = project.mod_version
+group = project.mod_group_id
+
+base {
+    archivesName = project.archives_base_name
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neoforge_version
+
+    runs {
+        client {
+            client()
+        }
+    }
+
+    mods {
+        "${project.mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+}
+
+dependencies {
+    // Upstream mod this expands on; mojmap-named jar, provides compile-time internals
+    // and the dev-runtime mod for runClient (MDG loads classpath jars that carry a
+    // neoforge.mods.toml as mods in runs).
+    implementation "maven.modrinth:female-gender:${project.fgm_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'   : project.mod_id,
+                'Specification-Vendor'  : project.mod_authors,
+                'Specification-Version' : '1',
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Vendor' : project.mod_authors
+        ])
+    }
+
+    // LICENSE lives at the repo root; fgmplusRepoRoot is injected by the mounting script
+    from(project.ext.fgmplusRepoRoot) {
+        include 'LICENSE'
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}

@@ -1,0 +1,10 @@
+# Offline probe artifacts: dependency jars and compiled probe classes are
+# regenerable, only the probe .java sources (+ the javap evidence dump) are
+# committed. Mirrors the 1.21.11-fabric _probe policy (root .gitignore holds
+# the fabric entries; the root file is off-limits to platforms, so the
+# neoforge-specific ones live here).
+_probe/fgm-3.2.2.jar
+_probe/jar/
+_probe/lib/
+_probe/nf/
+_probe/out/

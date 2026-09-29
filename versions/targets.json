@@ -32,5 +32,33 @@
     "layers": [],
     "upstream": "maven.modrinth:female-gender:5.0.0-Beta.3+1.21.11",
     "unverified": []
+  },
+  "1.21.1-fabric": {
+    "minecraft": "1.21.1",
+    "loader": "fabric",
+    "loader_version": "0.18.1",
+    "mappings": "official",
+    "java": 21,
+    "gradle": "9.2.0",
+    "project": "platforms/1.21.1-fabric",
+    "buildable": true,
+    "layers": [],
+    "upstream": "maven.modrinth:female-gender:3.2.1+1.21",
+    "unverified": [],
+    "note": "targets FGM 3.2.1+1.21 (3.1-lineage immediate rendering); verified by build+probes+world smoke"
+  },
+  "1.21.1-neoforge": {
+    "minecraft": "1.21.1",
+    "loader": "neoforge",
+    "loader_version": "21.1.252",
+    "mappings": "official",
+    "java": 21,
+    "gradle": "9.2.0",
+    "project": "platforms/1.21.1-neoforge",
+    "buildable": true,
+    "layers": [],
+    "upstream": "maven.modrinth:female-gender:3.2.2",
+    "note": "targets FGM 3.2.2 (ModDevGradle 2.0.147); loader 21.1.252 verified by build+smoke",
+    "unverified": []
   }
 }

@@ -1,0 +1,458 @@
+package io.github.e33epus.fgmplus.sound;
+
+import java.awt.Desktop;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
+import com.wildfire.main.WildfireSounds;
+import io.github.e33epus.fgmplus.FgmPlusMod;
+import io.github.e33epus.fgmplus.gui.ShapeStudioScreen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
+import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.server.packs.resources.IoSupplier;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+
+/**
+ * Custom female hurt sound support, mirroring FGM's own multi-ogg layout:
+ * every *.ogg dropped into config/fgmplus/sounds/ becomes an entry of the
+ * single fgmplus:custom_hurt event and SoundEngine picks one at random per
+ * play, exactly like wildfire_gender:female_hurt with its two female_damage
+ * oggs. Arbitrary file names (Chinese, spaces, upper case) are accepted: the
+ * pack exposes them under sanitized index names custom_hurt_0..N-1 mapped to
+ * the name-sorted directory listing, and sounds.json is regenerated on every
+ * resource read, so a full resource reload (F3+T or the preview button, which
+ * chains Minecraft#reloadResourcePacks) always picks up added/removed files.
+ * SoundManager#reload() is NOT enough for that: its only call is
+ * SoundEngine#reload (buffer cache), the sounds.json entry map is only rebuilt
+ * by the full reload listener pipeline. When the directory holds no ogg at all
+ * the pack exposes an empty sounds.json and every path falls back to FGM's own
+ * female hurt sound.
+ *
+ * <p>Pack injection: NeoForge 1.21.1 kept Forge's AddPackFindersEvent
+ * (net.neoforged.neoforge.event, mod bus, getPackType/addRepositorySource —
+ * verified in the 21.1.252 universal jar), so the 1.20.1 Forge mechanism
+ * carries over; no PackRepository mixin is needed (that is the Fabric-only
+ * workaround).</p>
+ *
+ * <p>1.21.1 pack API (all verified against MDG's mojmap 1.21.1 artifact):
+ * Pack.readMetaAndCreate(PackLocationInfo, ResourcesSupplier, PackType,
+ * PackSelectionConfig); PackMetadataSection(Component, int) with
+ * MetadataSectionSerializer-based getMetadataSection — the PackFormat record
+ * form is 1.21.9+.</p>
+ */
+public final class HurtSoundManager {
+
+    public static final ResourceLocation CUSTOM_HURT_ID =
+        ResourceLocation.fromNamespaceAndPath(FgmPlusMod.MODID, "custom_hurt");
+    // Same unregistered-SoundEvent pattern as FGM's WildfireSounds.FEMALE_HURT:
+    // the sound event never enters the registry, resolution goes purely through
+    // the client sounds.json.
+    public static final SoundEvent CUSTOM_HURT = SoundEvent.createVariableRangeEvent(CUSTOM_HURT_ID);
+
+    private static final String PACK_ID = "fgmplus_hurt_sounds";
+    // Resource pack format for MC 1.21.1
+    private static final int PACK_FORMAT = 34;
+    private static final String SOUNDS_JSON_PATH = "sounds.json";
+    // Pack-internal resource name of indexed ogg entry i (always lowercase, so
+    // even exotic file names on disk stay a valid ResourceLocation path)
+    private static final Pattern INDEXED_OGG = Pattern.compile("custom_hurt_(\\d+)\\.ogg");
+
+    // Guards the preview button: a resource reload is already in flight, extra
+    // clicks are dropped instead of queueing parallel reloads
+    private static final AtomicBoolean RELOADING = new AtomicBoolean(false);
+
+    // File-set fingerprint baked into the SoundManager at its last (re)load, or
+    // null while unknown. Seeded at client setup (the game's initial resource
+    // load runs after client setup and bakes in exactly this set) and refreshed
+    // whenever the preview button completes a full reload. If the current scan
+    // matches, previewing only needs the cheap SoundManager#reload (drops the
+    // cached ogg buffers, no LoadingOverlay) and plays instantly; a mismatch
+    // means added/removed/renamed files -> full resource reload.
+    private static volatile String lastLoadedFingerprint;
+
+    private static final byte[] EMPTY_SOUNDS_JSON = "{}".getBytes(StandardCharsets.UTF_8);
+
+    private static final byte[] PACK_MCMETA = ("{\"pack\":{"
+        + "\"pack_format\":" + PACK_FORMAT + ","
+        + "\"description\":\"FGM Plus custom hurt sounds\""
+        + "}}").getBytes(StandardCharsets.UTF_8);
+
+    private HurtSoundManager() {}
+
+    // ------------------------------------------------------------------
+    // Frozen API for the GUI (ShapeStudioScreen sound section)
+    // ------------------------------------------------------------------
+
+    /** Opens config/fgmplus/sounds/ (created if missing) in the system file browser. */
+    public static void openFolder() {
+        try {
+            Path dir = getSoundDir();
+            Files.createDirectories(dir);
+            Desktop.getDesktop().open(dir.toFile());
+        } catch (Throwable ignored) {
+            // No desktop support / open failure: silently ignore per spec
+        }
+    }
+
+    /**
+     * Preview: plays instantly when the loaded sound set already matches the
+     * directory (the common case — SoundManager#reload only drops the cached ogg
+     * buffers so replaced file contents play fresh, no LoadingOverlay flash);
+     * runs the full resource reload first only when files were added, removed or
+     * renamed since the last load (the sounds.json entry map is only rebuilt by
+     * the full pipeline). The 60s timeout exists because the reload future
+     * NEVER completes on failure (it goes through rollbackResourcePacks instead)
+     * and the future returned while another reload overlay is showing is
+     * discarded wholesale — without it the RELOADING latch would stay closed
+     * forever and silently kill the preview button for the rest of the session.
+     */
+    public static void reloadThenPlay() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            FgmPlusMod.LOGGER.debug("FGM Plus reloadThenPlay: no local player, skipping");
+            return;
+        }
+        List<Path> files = scanSoundFiles();
+        String fingerprint = fingerprintOf(files);
+        if (!files.isEmpty()
+            && mc.getSoundManager().getSoundEvent(CUSTOM_HURT_ID) != null
+            && Objects.equals(lastLoadedFingerprint, fingerprint)) {
+            //Loaded set matches and nothing changed since: play straight away, no
+            //reload of any kind. SoundManager#reload() would be a full audio-engine
+            //restart (SoundEngine.stopAll mutes music and every channel for a beat)
+            //— too invasive for a preview click. A same-name content swap keeps the
+            //old cached buffer until the user runs F3+T (documented in the UI).
+            testPlay();
+            if (mc.screen instanceof ShapeStudioScreen studio) {
+                studio.refreshSoundStatus();
+            }
+            return;
+        }
+        if (!RELOADING.compareAndSet(false, true)) {
+            return; //a reload is already running; its completion will play
+        }
+        mc.reloadResourcePacks()
+            .orTimeout(60, TimeUnit.SECONDS)
+            .whenComplete((v, t) -> mc.execute(() -> {
+                RELOADING.set(false);
+                if (t == null) {
+                    lastLoadedFingerprint = fingerprintOf(scanSoundFiles());
+                    testPlay();
+                    if (mc.screen instanceof ShapeStudioScreen studio) {
+                        studio.refreshSoundStatus();
+                    }
+                } else {
+                    FgmPlusMod.LOGGER.warn("FGM Plus resource reload failed or timed out", t);
+                }
+            }));
+    }
+
+    /**
+     * Plays the custom hurt sound once at the local player's position using the
+     * currently loaded entry map. When no ogg is present, falls back to FGM's
+     * own unregistered FEMALE_HURT event (same WildfireSounds + playLocalSound
+     * pattern FGM's hurt handler uses) so the preview button is never silent.
+     */
+    public static void testPlay() {
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
+        if (player == null) {
+            FgmPlusMod.LOGGER.debug("FGM Plus testPlay: no local player, skipping");
+            return;
+        }
+        boolean present = hasCustomSounds();
+        if (present) {
+            player.level().playLocalSound(player.getX(), player.getY(), player.getZ(),
+                CUSTOM_HURT, SoundSource.PLAYERS, 1.0F, 1.0F, false);
+        } else {
+            player.level().playLocalSound(player.getX(), player.getY(), player.getZ(),
+                WildfireSounds.FEMALE_HURT, SoundSource.PLAYERS, 1.0F, 1.0F, false);
+        }
+        FgmPlusMod.LOGGER.debug("FGM Plus testPlay: {} ogg file(s) present={}, playing {}",
+            scanSoundFiles().size(), present, present ? CUSTOM_HURT_ID : WildfireSounds.FEMALE_HURT.getLocation());
+    }
+
+    public static Component getStatusText() {
+        List<Path> files = scanSoundFiles();
+        if (files.isEmpty()) {
+            return Component.translatable("fgmplus.studio.sound_none");
+        }
+        Minecraft mc = Minecraft.getInstance();
+        boolean loaded = mc != null
+            && mc.getSoundManager().getSoundEvent(CUSTOM_HURT_ID) != null
+            && Objects.equals(lastLoadedFingerprint, fingerprintOf(files));
+        if (!loaded) {
+            return Component.translatable("fgmplus.studio.sound_pending", files.size());
+        }
+        StringBuilder label = new StringBuilder();
+        int shown = Math.min(2, files.size());
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) {
+                label.append(", ");
+            }
+            label.append(files.get(i).getFileName().toString());
+        }
+        if (files.size() > shown) {
+            label.append("…");
+        }
+        return Component.translatable("fgmplus.studio.sound_enabled", files.size(), label.toString());
+    }
+
+    // ------------------------------------------------------------------
+    // Redirect target used by WildfireEventHandlerMixin
+    // ------------------------------------------------------------------
+
+    /**
+     * Returns CUSTOM_HURT only when at least one user-provided ogg exists AND
+     * the entry map actually contains it (the map is only rebuilt by a full
+     * resource reload, so files dropped while the game is running would
+     * otherwise swap out the original sound for an unresolvable event: no
+     * sound at all on hurt, not even FGM's default — matching the preview
+     * path's fallback keeps both paths consistent). Null passthrough for
+     * non-FEMALE genders is preserved so FGM's own null-check keeps working.
+     */
+    public static SoundEvent resolveHurtSound(SoundEvent original) {
+        if (original == null || !hasCustomSounds()) {
+            return original;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getSoundManager().getSoundEvent(CUSTOM_HURT_ID) != null
+            ? CUSTOM_HURT : original;
+    }
+
+    // ------------------------------------------------------------------
+    // Paths and scanning
+    // ------------------------------------------------------------------
+
+    public static Path getSoundDir() {
+        return FMLPaths.CONFIGDIR.get().resolve(FgmPlusMod.MODID).resolve("sounds");
+    }
+
+    /** All *.ogg files in the sound dir (not hidden), sorted by file name. */
+    public static List<Path> scanSoundFiles() {
+        try (Stream<Path> stream = Files.list(getSoundDir())) {
+            return stream
+                .filter(Files::isRegularFile)
+                .filter(p -> {
+                    String name = p.getFileName().toString();
+                    return !name.startsWith(".") && name.toLowerCase(Locale.ROOT).endsWith(".ogg");
+                })
+                .sorted((a, b) -> a.getFileName().toString().compareTo(b.getFileName().toString()))
+                .toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    public static boolean hasCustomSounds() {
+        return !scanSoundFiles().isEmpty();
+    }
+
+    /** Cheap marker of the file-set identity (names in sorted order). */
+    private static String fingerprintOf(List<Path> files) {
+        StringBuilder sb = new StringBuilder();
+        for (Path p : files) {
+            sb.append(p.getFileName().toString()).append('|');
+        }
+        return sb.toString();
+    }
+
+    /** One sounds.json content per scan; empty dir -> no custom_hurt entry at all. */
+    private static byte[] buildSoundsJson(List<Path> files) {
+        if (files.isEmpty()) {
+            return EMPTY_SOUNDS_JSON;
+        }
+        StringBuilder json = new StringBuilder("{\"custom_hurt\":{\"category\":\"player\",\"sounds\":[");
+        for (int i = 0; i < files.size(); i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append("\"fgmplus:custom_hurt_").append(i).append('"');
+        }
+        json.append("]}}");
+        return json.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static IoSupplier<InputStream> ofBytes(byte[] data) {
+        return () -> new ByteArrayInputStream(data);
+    }
+
+    /** Seeds the loaded-set fingerprint once the client is coming up (idempotent). */
+    public static void seedFingerprint() {
+        if (lastLoadedFingerprint == null) {
+            lastLoadedFingerprint = fingerprintOf(scanSoundFiles());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Runtime resource pack (AddPackFindersEvent, the Forge mechanism kept
+    // by NeoForge 1.21.1)
+    // ------------------------------------------------------------------
+
+    /**
+     * Registers the always-on hidden pack on the mod event bus. Annotation-based
+     * discovery finds this nested class without touching FgmPlusMod.
+     */
+    @EventBusSubscriber(modid = FgmPlusMod.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    public static final class PackBootstrap {
+
+        private PackBootstrap() {}
+
+        @SubscribeEvent
+        public static void onAddPackFinders(AddPackFindersEvent event) {
+            if (event.getPackType() != PackType.CLIENT_RESOURCES) {
+                return;
+            }
+            event.addRepositorySource(loadPacks -> loadPacks.accept(createHurtSoundPack()));
+        }
+
+        @SubscribeEvent
+        public static void onClientSetup(FMLClientSetupEvent event) {
+            //Seed the fingerprint with the current set: the game's initial resource
+            //load scans the same directory (concurrently with mod loading, so a
+            //file dropped exactly during startup can slip through — the slow full
+            //reload path self-heals that on the next preview)
+            seedFingerprint();
+        }
+
+        private static Pack createHurtSoundPack() {
+            //required=true (PackSelectionConfig) -> PackRepository.rebuildSelected
+            //unconditionally keeps it selected; fixedPosition stops players from
+            //moving or disabling it. Note it still SHOWS UP in the resource pack
+            //screen as a locked entry — there is no way to hide a repository pack.
+            PackLocationInfo location = new PackLocationInfo(
+                PACK_ID,
+                Component.literal("FGM Plus Custom Hurt Sounds"),
+                PackSource.BUILT_IN,
+                Optional.empty());
+            //ResourcesSupplier has two abstract methods (primary + full), hence
+            //the anonymous class
+            Pack.ResourcesSupplier supplier = new Pack.ResourcesSupplier() {
+                @Override
+                public PackResources openPrimary(PackLocationInfo info) {
+                    return new HurtSoundPack(info);
+                }
+
+                @Override
+                public PackResources openFull(PackLocationInfo info, Pack.Metadata metadata) {
+                    return new HurtSoundPack(info);
+                }
+            };
+            return Pack.readMetaAndCreate(location, supplier, PackType.CLIENT_RESOURCES,
+                new PackSelectionConfig(true, Pack.Position.TOP, true));
+        }
+    }
+
+    private static final class HurtSoundPack implements PackResources {
+
+        private final PackLocationInfo location;
+
+        private HurtSoundPack(PackLocationInfo location) {
+            this.location = location;
+        }
+
+        @Override
+        public PackLocationInfo location() {
+            return this.location;
+        }
+
+        @Override
+        public IoSupplier<InputStream> getRootResource(String... names) {
+            if (names.length == 1 && "pack.mcmeta".equals(names[0])) {
+                return ofBytes(PACK_MCMETA);
+            }
+            return null;
+        }
+
+        @Override
+        public IoSupplier<InputStream> getResource(PackType type, ResourceLocation loc) {
+            if (type != PackType.CLIENT_RESOURCES || !FgmPlusMod.MODID.equals(loc.getNamespace())) {
+                return null;
+            }
+            String path = loc.getPath();
+            if (SOUNDS_JSON_PATH.equals(path)) {
+                return ofBytes(buildSoundsJson(scanSoundFiles()));
+            }
+            Matcher indexed = path.startsWith("sounds/")
+                ? INDEXED_OGG.matcher(path.substring("sounds/".length())) : null;
+            if (indexed != null && indexed.matches() && indexed.group(1).length() <= 9) {
+                //The length guard keeps a forged custom_hurt_<huge> request from
+                //throwing NumberFormatException and failing the whole reload
+                List<Path> files = scanSoundFiles();
+                int index = Integer.parseInt(indexed.group(1));
+                if (index < files.size()) {
+                    return IoSupplier.create(files.get(index));
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void listResources(PackType type, String namespace, String prefix, PackResources.ResourceOutput output) {
+            if (type != PackType.CLIENT_RESOURCES || !FgmPlusMod.MODID.equals(namespace)) {
+                return;
+            }
+            //sounds.json is intentionally NOT listed here: its consumers go through
+            //getResource, and the SoundManager's listResources pass runs with an
+            //".ogg" suffix filter that would discard it anyway
+            List<Path> files = scanSoundFiles();
+            for (int i = 0; i < files.size(); i++) {
+                String path = "sounds/custom_hurt_" + i + ".ogg";
+                if (path.startsWith(prefix)) {
+                    output.accept(ResourceLocation.fromNamespaceAndPath(FgmPlusMod.MODID, path),
+                        IoSupplier.create(files.get(i)));
+                }
+            }
+        }
+
+        @Override
+        public Set<String> getNamespaces(PackType type) {
+            return type == PackType.CLIENT_RESOURCES ? Set.of(FgmPlusMod.MODID) : Set.of();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> T getMetadataSection(MetadataSectionSerializer<T> serializer) throws IOException {
+            if (serializer == PackMetadataSection.TYPE) {
+                return (T) new PackMetadataSection(
+                    Component.literal("FGM Plus custom hurt sounds"), PACK_FORMAT);
+            }
+            return null;
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+}
