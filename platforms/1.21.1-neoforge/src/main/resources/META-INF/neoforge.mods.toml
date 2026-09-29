@@ -2,6 +2,11 @@ modLoader = "javafml"
 loaderVersion = "[4,)"
 license = "GPLv3"
 
+#without this FML never loads our mixin config: the mod starts fine but every
+#injection silently no-ops (MDG has no mixingradle to write the manifest for us)
+[[mixins]]
+    config = "fgmplus.mixins.json"
+
 [[mods]]
 modId = "fgmplus"
 version = "${file.jarVersion}"
