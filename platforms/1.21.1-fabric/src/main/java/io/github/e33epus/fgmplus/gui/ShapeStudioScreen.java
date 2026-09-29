@@ -1,5 +1,6 @@
 package io.github.e33epus.fgmplus.gui;
 
+import com.wildfire.gui.GuiUtils;
 import com.wildfire.gui.WildfireButton;
 import com.wildfire.gui.WildfireSlider;
 import com.wildfire.gui.screen.BaseWildfireScreen;
@@ -18,40 +19,33 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
 /**
  * Per-player breast shape editor (three-axis scale + perkiness + offsets +
- * roundness), composed like the accepted 1.21.11 baseline (FGM 5 style): a
- * centered translucent panel over a dimmed backdrop, FGM's 166px customization
- * grid (two 81px halves), 15px-tall buttons, the title centered at the wardrobe
- * title height and a live player preview in a scissored window left of the grid.
+ * roundness), composed like the accepted forge 1.20.1 studio (user ruling
+ * 2026-09-29, after the 1.21.11-style central panel was rejected on live
+ * acceptance): right-hand translucent panel with a title band, two 77px slider
+ * columns plus full-width perkiness/roundness rows, 20px-tall buttons, the 9x9
+ * X button top-right, the status line under the buttons and the large
+ * fixed-angle player preview on the left — drawn through FGM 3.2.1's own
+ * {@link GuiUtils#drawEntityOnScreen} with the same anchor/scale/angles the
+ * forge port and FGM's 3.x customization screen use.
  *
  * <p>1.21.1 notes: Screen#render calls renderBackground itself, so render()
- * must NOT call it again; renderTransparentBackground dims without the menu
- * blur (the blur-every-frame change is 1.21.2+, but the translucent look matches
- * the baseline either way). FGM 3.2.1's BaseWildfireScreen has no
- * renderPlayerInFrame and no onClose, so the preview is hand-rolled with a
- * scissor + InventoryScreen entity render, and {@link #onClose()} is added to
- * return to the wardrobe (ESC used to drop out of the wardrobe entirely). The
- * 3.2.1 WildfireButton/WildfireSlider keep the plain constructor API
+ * must NOT call it again; renderBackground carries the (GuiGraphics, int, int,
+ * float) signature. Unlike the forge screen, {@link #onClose()} is overridden
+ * so ESC returns to the wardrobe (3.2.x BaseWildfireScreen has no onClose and
+ * the vanilla default drops out of the wardrobe entirely). The
+ * WildfireButton/WildfireSlider plain constructor API is the 3.2.1 one
  * (WildfireSlider: x, y, w, h, min, max, initial, valueUpdate, messageUpdate,
  * onSave — verified in the remapped jar).</p>
  */
 public class ShapeStudioScreen extends BaseWildfireScreen {
 
-    //The accepted baseline's grid: 166px of content, split into two 81px halves
-    private static final int FULL_WIDTH = 166;
-    private static final int HALF_WIDTH = 81;
     private static final int PANEL_FILL = 0x55000000;
-    //FGM's buttons are 15px tall (its sliders stay 20px)
-    private static final int FGM_BUTTON_HEIGHT = 15;
 
-    //Diagnosis toggle switch (a field reference so the label can be flipped via
-    //setMessage — 3.2.x WildfireButton has no message supplier)
-    private WildfireButton debugPlaneButton;
     //Cached at init and refreshed on button presses: getStatusText() stats the disk,
     //which must not run every render frame
     private Component hurtSoundStatus;
@@ -62,41 +56,43 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 
     @Override
     public void init() {
-        int y = this.height / 2 - 11; //baseline row anchor
-        final int left = this.width / 2 - 36; //same column the baseline's sliders live in
-        final int right = left + HALF_WIDTH + 4;
+        int y = this.height / 2;
+        int bx = this.width / 2 + 30;
 
         //Initial slider positions only; callbacks re-resolve the player so edits
         //always land on the live CACHED entry, never a captured reference
         ShapeData shape = ((ShapeHolder) resolvePlayer()).fgmplus$getShape();
 
+        this.addRenderableWidget(new WildfireButton(this.width / 2 + 174, y - 81, 9, 9, Component.literal("X"),
+                button -> Minecraft.getInstance().setScreen(parent)));
+
         //Live preview: valueUpdate applies to the live shape while dragging (no persist,
         //no sync); onSave on release writes to disk and flags for sync
-        this.addRenderableWidget(slider(left, y - 24,
+        this.addRenderableWidget(new WildfireSlider(bx, y - 52, 77, 20,
                 ShapeData.MIN_SCALE, ShapeData.MAX_SCALE, shape.getScaleX(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setScaleX(value),
                 value -> Component.translatable("fgmplus.studio.scale", "X", String.format(Locale.ROOT, "%.2f", value)),
                 value -> persist("scaleX", value)));
 
-        this.addRenderableWidget(slider(left, y - 4,
+        this.addRenderableWidget(new WildfireSlider(bx, y - 32, 77, 20,
                 ShapeData.MIN_SCALE, ShapeData.MAX_SCALE, shape.getScaleY(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setScaleY(value),
                 value -> Component.translatable("fgmplus.studio.scale", "Y", String.format(Locale.ROOT, "%.2f", value)),
                 value -> persist("scaleY", value)));
 
-        this.addRenderableWidget(slider(left, y + 16,
+        this.addRenderableWidget(new WildfireSlider(bx, y - 12, 77, 20,
                 ShapeData.MIN_SCALE, ShapeData.MAX_SCALE, shape.getScaleZ(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setScaleZ(value),
                 value -> Component.translatable("fgmplus.studio.scale", "Z", String.format(Locale.ROOT, "%.2f", value)),
                 value -> persist("scaleZ", value)));
 
-        this.addRenderableWidget(slider(right, y - 24,
+        this.addRenderableWidget(new WildfireSlider(bx + 81, y - 52, 77, 20,
                 ShapeData.MIN_OFFSET, ShapeData.MAX_OFFSET, shape.getOffsetX(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setOffsetX(value),
                 value -> Component.translatable("fgmplus.studio.pos", "X", String.format(Locale.ROOT, "%+.2f", value)),
                 value -> persist("offsetX", value)));
 
-        this.addRenderableWidget(slider(right, y - 4,
+        this.addRenderableWidget(new WildfireSlider(bx + 81, y - 32, 77, 20,
                 ShapeData.MIN_OFFSET, ShapeData.MAX_OFFSET, shape.getOffsetY(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setOffsetY(value),
                 value -> Component.translatable("fgmplus.studio.pos", "Y", String.format(Locale.ROOT, "%+.2f", value)),
@@ -105,7 +101,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         //UI shows the inverted value so that dragging RIGHT protrudes (user's
         //expected direction): stored offsetZ is positive toward the torso back
         //(front = -z, user-measured), so the slider negates on both read and write
-        WildfireSlider offsetZ = slider(right, y + 16,
+        WildfireSlider offsetZ = new WildfireSlider(bx + 81, y - 12, 77, 20,
                 ShapeData.MIN_OFFSET, ShapeData.MAX_OFFSET, -shape.getOffsetZ(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setOffsetZ(-value),
                 value -> Component.translatable("fgmplus.studio.pos", "Z", String.format(Locale.ROOT, "%+.2f", value)),
@@ -113,7 +109,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         offsetZ.setTooltip(Tooltip.create(Component.translatable("fgmplus.studio.pos_z_tip")));
         this.addRenderableWidget(offsetZ);
 
-        this.addRenderableWidget(slider(left, y + 36,
+        this.addRenderableWidget(new WildfireSlider(bx, y + 8, 158, 20,
                 ShapeData.MIN_PERK, ShapeData.MAX_PERK, shape.getPerkiness(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setPerkiness(value),
                 value -> Component.translatable("fgmplus.studio.perkiness", String.format(Locale.ROOT, "%+.0f", value)),
@@ -122,7 +118,7 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         //Roundness: 0 = FGM's flat box (the "triangle" silhouette), 1 = full
         //superellipsoid; displayed as a percentage. Syncs to everyone like the
         //rest of the shape payload
-        WildfireSlider roundness = slider(right, y + 36,
+        WildfireSlider roundness = new WildfireSlider(bx, y + 28, 158, 20,
                 ShapeData.MIN_ROUNDNESS, ShapeData.MAX_ROUNDNESS, shape.getRoundness(),
                 value -> ((ShapeHolder) resolvePlayer()).fgmplus$getShape().setRoundness(value),
                 value -> Component.translatable("fgmplus.studio.roundness", String.format(Locale.ROOT, "%.0f", value * 100f)),
@@ -135,19 +131,19 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
         //set matches the directory and only chains a full resource reload when the
         //files changed, so newly dropped/renamed files are picked up without restart
         this.hurtSoundStatus = HurtSoundManager.getStatusText();
-        this.addRenderableWidget(new WildfireButton(left, y + 56, HALF_WIDTH, FGM_BUTTON_HEIGHT,
+        this.addRenderableWidget(new WildfireButton(bx, y + 48, 77, 20,
                 Component.translatable("fgmplus.studio.sound_folder"), button -> {
                     HurtSoundManager.openFolder();
                     this.hurtSoundStatus = HurtSoundManager.getStatusText();
                 }));
-        this.addRenderableWidget(new WildfireButton(right, y + 56, HALF_WIDTH, FGM_BUTTON_HEIGHT,
+        this.addRenderableWidget(new WildfireButton(bx + 81, y + 48, 77, 20,
                 Component.translatable("fgmplus.studio.preview"), button -> {
                     HurtSoundManager.reloadThenPlay();
                     this.hurtSoundStatus = HurtSoundManager.getStatusText();
                 },
                 Tooltip.create(Component.translatable("fgmplus.studio.preview_tip"))));
 
-        this.addRenderableWidget(new WildfireButton(left, y + 76, HALF_WIDTH, FGM_BUTTON_HEIGHT,
+        this.addRenderableWidget(new WildfireButton(bx, y + 68, 77, 20,
                 Component.translatable("fgmplus.studio.reset"), button -> {
                     ((ShapeHolder) resolvePlayer()).fgmplus$setShape(new ShapeData());
                     persist("reset", 0.0F);
@@ -156,27 +152,19 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
                 }));
         //Diagnosis: shows the computed torso-back plane; if it hugs the back from
         //every angle the transform chain behind the flatten clamp is proven
-        this.debugPlaneButton = new WildfireButton(right, y + 76, HALF_WIDTH, FGM_BUTTON_HEIGHT,
+        this.addRenderableWidget(new WildfireButton(bx + 81, y + 68, 77, 20,
                 Component.translatable(ShapeRenderState.debugPlane ? "fgmplus.studio.debug_on" : "fgmplus.studio.debug_off"), button -> {
                     ShapeRenderState.debugPlane = !ShapeRenderState.debugPlane;
                     button.setMessage(Component.translatable(ShapeRenderState.debugPlane ? "fgmplus.studio.debug_on" : "fgmplus.studio.debug_off"));
                 },
-                Tooltip.create(Component.translatable("fgmplus.studio.debug_tip")));
-        this.addRenderableWidget(this.debugPlaneButton);
+                Tooltip.create(Component.translatable("fgmplus.studio.debug_tip"))));
 
         super.init();
     }
 
-    private static WildfireSlider slider(int x, int y, float min, float max, float current,
-            it.unimi.dsi.fastutil.floats.FloatConsumer update,
-            it.unimi.dsi.fastutil.floats.Float2ObjectFunction<Component> message,
-            it.unimi.dsi.fastutil.floats.FloatConsumer save) {
-        return new WildfireSlider(x, y, HALF_WIDTH, 20, min, max, current, update, message, save);
-    }
-
     @Override
     public void onClose() {
-        //3.2.x BaseWildfireScreen has no onClose, so ESC used to fall through to
+        //3.2.x BaseWildfireScreen has no onClose, so ESC would fall through to
         //the vanilla default (null screen) instead of returning to the wardrobe
         this.minecraft.setScreen(parent);
     }
@@ -208,35 +196,17 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
     }
 
     /**
-     * Baseline composition: dim the world, the translucent panel over the grid,
-     * the title centered at the wardrobe title height, and the live player
-     * preview in a scissored window left of the sliders (FGM 3.2.x has no
-     * renderPlayerInFrame, so the window is hand-rolled).
+     * forge composition: the world stays visible through the vanilla dim behind a
+     * right-hand translucent panel (main slab + 1px-inset title band), exactly the
+     * fills the forge 1.20.1 studio draws.
      */
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        this.renderTransparentBackground(graphics);
-
+        super.renderBackground(graphics, mouseX, mouseY, partialTick);
         int x = this.width / 2;
         int y = this.height / 2;
-        //Same translucent panel style as the baseline, sized over the grid
-        graphics.fill(x - 40, y - 32, x + 136, y + 113, PANEL_FILL);
-
-        //Title centered at FGM's wardrobe title height
-        graphics.drawString(this.font, this.title, x - this.font.width(this.title) / 2, y - 82, 0xFFFFFF, false);
-
-        //Large live preview of the actual player; the model renders through the
-        //same GenderLayer pipeline, so live slider edits show up here
-        Minecraft minecraft = this.minecraft;
-        if (minecraft != null && minecraft.level != null) {
-            Player ent = minecraft.level.getPlayerByUUID(this.playerUUID);
-            if (ent != null) {
-                graphics.enableScissor(x - 128, y - 35, x - 52, y + 53);
-                InventoryScreen.renderEntityInInventoryFollowsMouse(graphics,
-                        x - 128, y - 35, x - 52, y + 113, 70, 0.0F, mouseX, mouseY + 35, ent);
-                graphics.disableScissor();
-            }
-        }
+        graphics.fill(x + 28, y - 85, x + 190, y + 98, PANEL_FILL);
+        graphics.fill(x + 29, y - 84, x + 189, y - 60, PANEL_FILL);
     }
 
     @Override
@@ -246,11 +216,25 @@ public class ShapeStudioScreen extends BaseWildfireScreen {
 
         int x = this.width / 2;
         int y = this.height / 2;
-        //Status text (loaded sound files) below the 15px button rows; can exceed the
-        //162 px panel (long file names), so wrap to at most two lines with a tail
-        int ly = y + 94;
-        for (String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, FULL_WIDTH - 4)) {
-            graphics.drawCenteredString(this.font, line, x + 48, ly, 0xE0E0E0);
+        graphics.drawString(this.font, this.title, x + 32, y - 81, 0xFFFFFF, false);
+
+        //Large live preview of the actual player through FGM's own utility, same
+        //anchor/scale/fixed angles as the forge 1.20.1 studio (GuiUtils computes
+        //the atan/40 head-follow from the two "virtual mouse" floats); the model
+        //renders through the same GenderLayer pipeline, so live edits show up here
+        if (this.minecraft != null && this.minecraft.level != null) {
+            Player ent = this.minecraft.level.getPlayerByUUID(this.playerUUID);
+            if (ent != null) {
+                GuiUtils.drawEntityOnScreen(graphics, x - 102, y + 275, 200, -20.0F, -20.0F, ent);
+            }
+        }
+
+        int cx = x + 109; //center of the translucent panel (x+28..x+190)
+        //Status text can exceed the 162 px panel (long file names); wrap it to the
+        //panel width, at most two lines with an ellipsis tail
+        int ly = y + 88;
+        for (String line : wrapStatus(this.hurtSoundStatus.getString(), this.font, 150)) {
+            graphics.drawCenteredString(this.font, line, cx, ly, 0xE0E0E0);
             ly += 10;
         }
     }

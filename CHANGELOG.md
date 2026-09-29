@@ -16,7 +16,7 @@
 
 **修复（1.6.0 补发）**
 
-- 造型工作室重排为与 1.21.11 端一致的中央半透明面板构图（FGM 5 式 166px 网格、15px 按钮、标题居中、左侧玩家预览小窗），ESC 现在返回衣柜而不再直接退出游戏
+- 造型工作室重排为与 forge 1.20.1 端一致的构图（右挂半透明面板、20px 按钮、右上角关闭钮、左侧固定大预览，预览走本世代 FGM 原生路径），ESC 现在返回衣柜而不再直接退出游戏
 - 衣柜「造型工作室」入口按钮不再绘制贴图上不存在的灰色边框，按钮行位两端统一
 - 深度滑条同值体型与 1.21.11 端一致：渲染深度系数从 FGM 3.2.x 的 0.0625/格改为 FGM 5 的 0.0425/格（有意偏离 3.2.x 原生手感以对齐基准端）
 - NeoForge 端形状同步 mixin 移入公共 mixin 列表，专用服务器上远端玩家造型不再全部回退默认
@@ -32,7 +32,7 @@
 
 **Fixed (1.6.0 re-release)**
 
-- The Shape Studio is recomposed into the centered translucent-panel layout of the 1.21.11 port (FGM 5 grid, 15px buttons, centered title, left player preview window), and ESC now returns to the wardrobe instead of quitting the game
+- The Shape Studio is recomposed into the forge 1.20.1 layout (right-hand translucent panel, 20px buttons, top-right close button, large fixed-angle left player preview drawn through FGM's own preview path), and ESC now returns to the wardrobe instead of quitting the game
 - The wardrobe's Shape Studio entry button no longer draws a gray ghost frame the texture never has; button rows are unified across both ports
 - Depth slider values now yield the same body shape as 1.21.11: the render depth coefficient follows FGM 5's 0.0425/unit instead of 3.2.x's 0.0625 (an intentional deviation from the native 3.2.x feel to match the baseline)
 - The NeoForge shape-sync mixin now ships in the common mixin list, so remote players' shapes no longer fall back to defaults on dedicated servers
