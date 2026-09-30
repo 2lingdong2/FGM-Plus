@@ -145,9 +145,14 @@ public final class HurtSoundManager {
         }
         List<Path> files = scanSoundFiles();
         String fingerprint = fingerprintOf(files);
-        if (!files.isEmpty()
-            && mc.getSoundManager().getSoundEvent(CUSTOM_HURT_ID) != null
-            && Objects.equals(lastLoadedFingerprint, fingerprint)) {
+        //Sync-based fast path, not "files non-empty": an empty sound folder with
+        //nothing loaded is also in sync — play the fallback sound right away. The
+        //old !files.isEmpty() guard made every preview click chain a full resource
+        //reload on installs that have no custom sounds yet
+        boolean loaded = mc.getSoundManager().getSoundEvent(CUSTOM_HURT_ID) != null;
+        boolean inSync = files.isEmpty() ? !loaded
+            : loaded && Objects.equals(lastLoadedFingerprint, fingerprint);
+        if (inSync) {
             //Loaded set matches and nothing changed since: play straight away, no
             //reload of any kind. SoundManager#reload() would be a full audio-engine
             //restart (SoundEngine.stopAll mutes music and every channel for a beat)
