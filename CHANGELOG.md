@@ -25,6 +25,7 @@
 - 造型工作室新增「乳沟桥接」开关并同步四端：默认开启即上述效果，关闭恢复纯椭球轮廓，FGM 自带的胸部间距滑条恢复原有效果；开关随造型数据存盘并同步，所有人看到一致
 - 试听不再在尚无自定义音效文件时链式全量重载资源包：空音效目录且未加载时直接秒播回退音（此前该场景下每次点试听都会整包重载、音频引擎静默一拍）
 - 衣柜「造型工作室」入口对齐 forge 端构图：按钮以 20px 螺距紧接 FGM 自家菜单列表，面板延伸带边框无缝续接贴图（贴图与 forge 端逐像素同源，配色实测命中）
+- 「音效文件夹」按钮改用原版的平台打开助手：AWT Desktop 在 headless JVM 直接抛异常、Windows 上对文件夹也不可靠，且失败被静默吞掉（点了没反应）；现失败会留 debug 日志
 
 ----
 
@@ -45,6 +46,7 @@
 - The Shape Studio gains a "Cleavage bridge" toggle synced to all four targets: ON by default (the effect above), OFF restores the plain superellipsoid and FGM's own separation slider feel; the toggle persists with the shape data and syncs, so everyone sees the same thing
 - Preview no longer chains a full resource-pack reload when no custom sound files exist yet: an empty sound folder with nothing loaded plays the fallback sound instantly (previously every preview click restarted the whole audio engine on such installs)
 - The wardrobe's Shape Studio entry matches the forge composition: the button continues FGM's own menu list at the 20px pitch and the panel extension carries the seamless border (the texture is pixel-identical to forge's; the colors were verified against it)
+- The "Sound Folder" button now uses the vanilla platform-open helper: AWT Desktop#open throws in headless JVMs and is unreliable for directories on Windows, and the failure was swallowed silently (an unresponsive click); failures now leave a debug log line
 
 **Added**
 

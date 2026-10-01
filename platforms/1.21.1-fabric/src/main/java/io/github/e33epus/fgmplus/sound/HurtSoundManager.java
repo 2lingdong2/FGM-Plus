@@ -1,5 +1,6 @@
 package io.github.e33epus.fgmplus.sound;
 
+import net.minecraft.Util;
 import com.wildfire.main.WildfireSounds;
 import io.github.e33epus.fgmplus.FgmPlusMod;
 import io.github.e33epus.fgmplus.gui.ShapeStudioScreen;
@@ -20,7 +21,6 @@ import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 
-import java.awt.Desktop;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -108,9 +108,12 @@ public final class HurtSoundManager {
 		try {
 			Path dir = getSoundDir();
 			Files.createDirectories(dir);
-			Desktop.getDesktop().open(dir.toFile());
-		} catch(Throwable ignored) {
-			// No desktop support / open failure: silently ignore per spec
+			//here — it throws in headless JVMs and its Windows shell-execute path is
+		//unreliable for directories, which made this click a silent no-op
+		net.minecraft.Util.getPlatform().openFile(dir.toFile());
+		} catch(Throwable t) {
+			// surfaced at debug: a silent no-op click is undebuggable
+		FgmPlusMod.LOGGER.debug("FGM Plus: failed to open the sound folder", t);
 		}
 	}
 
