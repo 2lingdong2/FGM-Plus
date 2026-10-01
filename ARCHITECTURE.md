@@ -14,6 +14,8 @@ shared/src/              纯 Java + 映射中立：全目标共用（形状数�
 platforms/
   1.20.1-forge/          ForgeGradle 6 / Gradle 8.4 / Java 17 / 官方 mappings（FGM 3.1）
   1.21.11-fabric/        Loom 1.14 / Gradle 9.2 / Java 21 / 官方 mappings（FGM 5.0-beta3）
+  1.21.1-fabric/         Loom 1.14 / Gradle 9.2 / Java 21 / 官方 mappings（FGM 3.2.1）
+  1.21.1-neoforge/       ModDevGradle 2 / Gradle 9.2 / Java 21 / 官方 mappings（FGM 3.2.2）
 gradle/fgmplus-layers.gradle   挂载脚本：读根身份，按 targets.json 把 shared+层接进源集
 tools/
   verify_targets.py      守卫闸（本地与 CI 同一份；--list-buildable 供脚本消费）
@@ -43,21 +45,22 @@ python tools/verify_targets.py --matrix-out _matrix.json
    工程目录存在就必须在矩阵里有条目。
 3. **副本必须有闸**：同一段代码出现两份，要么进 `shared/`、要么进映射层 + 孪生、
    要么进钉等清单。没有第四种状态。现状：`ShapeData` / `ShapeHolder` /
-   `ShapeStateHolder` / `ShapeRenderState` 在 shared/；`ShapeStore` 两平台各一份
+   `ShapeStateHolder` / `ShapeRenderState` 在 shared/；`ShapeStore` 四平台各一份
    （配置目录来源是平台 API：FMLPaths vs FabricLoader），属「有意双份」，将来
    做 facade 化（构造注入 base dir）即可上提。
 
 ## 映射家族的现实
 
-两个目标都用 Mojang 官方 mappings（Forge 的 official channel、loom 的
+四个目标都用 Mojang 官方 mappings（ForgeGradle official channel、MDG / loom 的
 officialMojangMappings），所以 shared/ 不需要映射孪生。哪天加 Yarn 家族目标，
 官方名共享代码进 `layers/mapping/official/`，Yarn 侧留同路径孪生（同 e33chat）。
 
 ## 平台差异速览（改代码前先看这行）
 
-- 上游 FGM：Forge 端对 **FGM 3.1**（`GenderPlayer` / `renderBreastWithTransforms`
-  / 包尾追加同步），Fabric 端对 **FGM 5.0-beta**（`PlayerConfig` /
-  `BreastRenderCommand` 提交式渲染 / 独立 `fgmplus:shape_sync` payload）。
-  两端的 mixin 集合完全不同，形状数据与磁盘存储是共享面。
+- 上游 FGM：Forge 1.20.1 端对 **FGM 3.1**（`GenderPlayer` / `renderBreastWithTransforms`
+  / 包尾追加同步），Fabric 1.21.11 端对 **FGM 5.0-beta**（`PlayerConfig` /
+  `BreastRenderCommand` 提交式渲染 / 独立 `fgmplus:shape_sync` payload），
+  1.21.1 双端对 **FGM 3.2.x**（3.1 血统的即时渲染线，mixin 集按 NeoForge / Fabric
+  API 各自适配）。mixin 集合按上游血统分三组，形状数据与磁盘存储是共享面。
 - 版本号：全平台同一个 `mod_version`。上游 FGM 大版本升级（如 5.0 出正式版）
   通常要重验对应平台的 mixin，届时 bump `mod_version`。

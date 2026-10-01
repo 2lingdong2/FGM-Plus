@@ -8,6 +8,8 @@ Real bust scaling and per-player breast shaping for [Wildfire's Female Gender Mo
 |---|---|---|
 | Forge 1.20.1 | FGM 3.1 (1.20.1-3.x) | `fgmplus-forge-1.20.1-<ver>.jar` |
 | Fabric 1.21.11 | FGM 5.0.0-Beta.3+1.21.11 | `fgmplus-fabric-1.21.11-<ver>.jar` |
+| Fabric 1.21.1 | FGM 3.2.1+1.21 | `fgmplus-fabric-1.21.1-<ver>.jar` |
+| NeoForge 1.21.1 | FGM 3.2.2 | `fgmplus-neoforge-1.21.1-<ver>.jar` |
 
 ## What it does
 
