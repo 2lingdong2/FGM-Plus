@@ -23,3 +23,6 @@ platforms/*/_probe/*.jar
 platforms/*/_probe/*.args
 platforms/*/_probe/*.txt
 *.javap
+
+# internal working plans (local-only, never publish)
+PLAN-*.md
