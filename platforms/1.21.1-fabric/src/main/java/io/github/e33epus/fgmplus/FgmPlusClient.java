@@ -13,6 +13,10 @@ public class FgmPlusClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		//the import folder must exist for manual ogg drops, even if the studio's
+		//open-folder button is never clicked
+		io.github.e33epus.fgmplus.sound.HurtSoundManager.ensureSoundDir();
+
 		//Seed the sound-file fingerprint before the game's initial resource load
 		//scans the same directory (HurtSoundManager preview fast path)
 		io.github.e33epus.fgmplus.sound.HurtSoundManager.seedFingerprint();

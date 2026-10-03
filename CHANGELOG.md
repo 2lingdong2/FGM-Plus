@@ -25,7 +25,9 @@
 - 造型工作室新增「乳沟桥接」开关并同步四端：默认开启即上述效果，关闭恢复纯椭球轮廓，FGM 自带的胸部间距滑条恢复原有效果；开关随造型数据存盘并同步，所有人看到一致
 - 试听不再在尚无自定义音效文件时链式全量重载资源包：空音效目录且未加载时直接秒播回退音（此前该场景下每次点试听都会整包重载、音频引擎静默一拍）
 - 衣柜「造型工作室」入口对齐 forge 端构图：按钮以 20px 螺距紧接 FGM 自家菜单列表，面板延伸带边框无缝续接贴图（贴图与 forge 端逐像素同源，配色实测命中）
-- 「音效文件夹」按钮改用原版的平台打开助手：AWT Desktop 在 headless JVM 直接抛异常、Windows 上对文件夹也不可靠，且失败被静默吞掉（点了没反应）；现失败会留 debug 日志
+- 「音效文件夹」按钮改用原版的平台打开助手：AWT Desktop 在 headless JVM 直接抛异常、Windows 上对文件夹也不可靠，且失败被静默吞掉（点了没反应）
+- 音效导入目录 `config/fgmplus/sounds/` 现在随客户端启动自动创建（此前只在点击「音效文件夹」按钮时创建，1.21.x 端想手动导入音效却连目录都没有）
+- 「音效文件夹」按钮在 Windows 上改为直接 explorer.exe 打开目录：反汇编证实原版助手走 rundll32 FileProtocolHandler 处理单斜杠 file:/ URL，对目录静默无动作；打开失败日志同步升级为 WARN
 
 ----
 
@@ -46,7 +48,9 @@
 - The Shape Studio gains a "Cleavage bridge" toggle synced to all four targets: ON by default (the effect above), OFF restores the plain superellipsoid and FGM's own separation slider feel; the toggle persists with the shape data and syncs, so everyone sees the same thing
 - Preview no longer chains a full resource-pack reload when no custom sound files exist yet: an empty sound folder with nothing loaded plays the fallback sound instantly (previously every preview click restarted the whole audio engine on such installs)
 - The wardrobe's Shape Studio entry matches the forge composition: the button continues FGM's own menu list at the 20px pitch and the panel extension carries the seamless border (the texture is pixel-identical to forge's; the colors were verified against it)
-- The "Sound Folder" button now uses the vanilla platform-open helper: AWT Desktop#open throws in headless JVMs and is unreliable for directories on Windows, and the failure was swallowed silently (an unresponsive click); failures now leave a debug log line
+- The "Sound Folder" button now uses the vanilla platform-open helper: AWT Desktop#open throws in headless JVMs and is unreliable for directories on Windows, and the failure was swallowed silently (an unresponsive click)
+- The sound import folder `config/fgmplus/sounds/` is now created at client startup (previously it was only created by clicking "Sound Folder", leaving 1.21.x installs with nowhere to drop files manually)
+- The "Sound Folder" button on Windows now launches explorer.exe on the plain path: disassembly showed the vanilla helper routes directories through rundll32 FileProtocolHandler with a single-slash file:/ URL, which silently does nothing for directories; open failures now log at WARN
 
 **Added**
 

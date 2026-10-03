@@ -108,12 +108,17 @@ public final class HurtSoundManager {
 		try {
 			Path dir = getSoundDir();
 			Files.createDirectories(dir);
-			//here — it throws in headless JVMs and its Windows shell-execute path is
-		//unreliable for directories, which made this click a silent no-op
-		net.minecraft.Util.getPlatform().openFile(dir.toFile());
+			//vanilla Util.openFile routes directories through rundll32 FileProtocolHandler
+			//on a single-slash file:/ URL, which silently opens nothing on Windows;
+			//explorer.exe on the plain path is the one open that always works there
+			if (System.getProperty("os.name", "").contains("Windows")) {
+				new ProcessBuilder("explorer.exe", dir.toAbsolutePath().toString()).start();
+			} else {
+				net.minecraft.Util.getPlatform().openFile(dir.toFile());
+			}
 		} catch(Throwable t) {
-			// surfaced at debug: a silent no-op click is undebuggable
-		FgmPlusMod.LOGGER.debug("FGM Plus: failed to open the sound folder", t);
+			// surfaced at warn: a silent no-op click is undebuggable
+			FgmPlusMod.LOGGER.warn("FGM Plus: failed to open the sound folder", t);
 		}
 	}
 
@@ -251,6 +256,16 @@ public final class HurtSoundManager {
 	// ------------------------------------------------------------------
 	// Paths and scanning
 	// ------------------------------------------------------------------
+
+	/** Creates config/fgmplus/sounds/ up front, so manual ogg imports always have a
+	 *  home even if the studio's open-folder button is never clicked. */
+	public static void ensureSoundDir() {
+		try {
+			Files.createDirectories(getSoundDir());
+		} catch(IOException e) {
+			FgmPlusMod.LOGGER.warn("FGM Plus: could not create the sound folder", e);
+		}
+	}
 
 	public static Path getSoundDir() {
 		return FabricLoader.getInstance().getConfigDir().resolve(FgmPlusMod.MODID).resolve("sounds");
