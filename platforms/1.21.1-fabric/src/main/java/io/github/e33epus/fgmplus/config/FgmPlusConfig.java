@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Plain JSON config (config/fgmplus.json), replacing the Forge 1.20.1 TOML spec.
+ * Plain JSON config (config/fgmplus/fgmplus.json), replacing the Forge 1.20.1 TOML spec.
  *
  * <p>Loaded lazily on first access: the mixin that widens FGM's slider keys reads these
  * values while FGM's own config classes initialize, which can happen before any mod
@@ -52,12 +52,22 @@ public final class FgmPlusConfig {
 	}
 
 	private static Path file() {
-		return FabricLoader.getInstance().getConfigDir().resolve(FgmPlusMod.MODID + ".json");
+		return FabricLoader.getInstance().getConfigDir().resolve(FgmPlusMod.MODID).resolve(FgmPlusMod.MODID + ".json");
 	}
 
 	private static synchronized void load() {
 		if(loaded) return;
 		loaded = true;
+		//config lives at config/fgmplus/fgmplus.json since 1.6.1 (was fgmplus.json in
+		//the config root); carry the old file over so slider-widening settings survive
+		try {
+			Path legacy = FabricLoader.getInstance().getConfigDir().resolve(FgmPlusMod.MODID + ".json");
+			if(!Files.exists(file()) && Files.isRegularFile(legacy)) {
+				Files.move(legacy, file());
+			}
+		} catch(Exception e) {
+			FgmPlusMod.LOGGER.warn("FGM Plus: could not migrate the old config file", e);
+		}
 		Path file = file();
 		if(Files.isRegularFile(file)) {
 			try(Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {

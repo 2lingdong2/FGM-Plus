@@ -26,8 +26,6 @@
 - 试听不再在尚无自定义音效文件时链式全量重载资源包：空音效目录且未加载时直接秒播回退音（此前该场景下每次点试听都会整包重载、音频引擎静默一拍）
 - 衣柜「造型工作室」入口对齐 forge 端构图：按钮以 20px 螺距紧接 FGM 自家菜单列表，面板延伸带边框无缝续接贴图（贴图与 forge 端逐像素同源，配色实测命中）
 - 「音效文件夹」按钮改用原版的平台打开助手：AWT Desktop 在 headless JVM 直接抛异常、Windows 上对文件夹也不可靠，且失败被静默吞掉（点了没反应）
-- 音效导入目录 `config/fgmplus/sounds/` 现在随客户端启动自动创建（此前只在点击「音效文件夹」按钮时创建，1.21.x 端想手动导入音效却连目录都没有）
-- 「音效文件夹」按钮在 Windows 上改为直接 explorer.exe 打开目录：反汇编证实原版助手走 rundll32 FileProtocolHandler 处理单斜杠 file:/ URL，对目录静默无动作；打开失败日志同步升级为 WARN
 
 ----
 
@@ -49,14 +47,28 @@
 - Preview no longer chains a full resource-pack reload when no custom sound files exist yet: an empty sound folder with nothing loaded plays the fallback sound instantly (previously every preview click restarted the whole audio engine on such installs)
 - The wardrobe's Shape Studio entry matches the forge composition: the button continues FGM's own menu list at the 20px pitch and the panel extension carries the seamless border (the texture is pixel-identical to forge's; the colors were verified against it)
 - The "Sound Folder" button now uses the vanilla platform-open helper: AWT Desktop#open throws in headless JVMs and is unreliable for directories on Windows, and the failure was swallowed silently (an unresponsive click)
-- The sound import folder `config/fgmplus/sounds/` is now created at client startup (previously it was only created by clicking "Sound Folder", leaving 1.21.x installs with nowhere to drop files manually)
-- The "Sound Folder" button on Windows now launches explorer.exe on the plain path: disassembly showed the vanilla helper routes directories through rundll32 FileProtocolHandler with a single-slash file:/ URL, which silently does nothing for directories; open failures now log at WARN
 
 **Added**
 
 - **Breast roundness on Forge 1.20.1**: the roundness slider introduced on Fabric in 1.5.0 now covers Forge — same shape data, same 0–100% continuous morph (flat box → superellipsoid), reimplemented on FGM 3.1's immediate render pipeline (static window carrying roundness into `renderBox`, separated `endVertex` chain); `roundness=0` keeps the 1.4.1 path bit-identical
 - **Two new platforms: NeoForge 1.21.1 and Fabric 1.21.1** (upstream FGM **3.2.2** / **3.2.1+1.21**, ModDevGradle 2.0.147 / Fabric Loom): full 1.6.0 feature port — bust slider widening (bustSizeMax default 4.0 = 500%), the Shape Studio (three-axis scale / offsets / perkiness / roundness + hurt sounds), and roundness rendering (3.2.x is 3.1-lineage immediate rendering: `GenderPlayer`→`PlayerConfig`, armor split into `GenderArmorLayer`, capture moved to `setupTransformations`); NeoForge injects the hurt-sound pack via `AddPackFindersEvent`, Fabric 1.21.1 rides the standalone `fgmplus:shape_sync` channel
 - The target matrix grows to four: `1.20.1-forge`, `1.21.1-neoforge`, `1.21.1-fabric`, `1.21.11-fabric` — all buildable, all shipping 1.6.0
+
+## v1.6.1
+
+**修复**
+
+- 配置文件归位到 `config/fgmplus/` 子目录并统一命名：forge `config/fgmplus-common.toml` → `config/fgmplus/fgmplus.toml`，其余三端 `config/fgmplus.json` → `config/fgmplus/fgmplus.json`；旧文件首次启动自动迁移后删除，滑条拓宽设置不丢
+- 音效导入目录 `config/fgmplus/sounds/` 随客户端启动自动创建（此前只在点击「音效文件夹」按钮时创建，1.21.x 端想手动导入音效却连目录都没有）
+- 「音效文件夹」按钮在 Windows 上改为直接 explorer.exe 打开目录：反汇编证实原版助手走 rundll32 FileProtocolHandler 处理单斜杠 file:/ URL，对目录静默无动作；打开失败日志同步升级为 WARN
+
+----
+
+**Fixed**
+
+- Config files move into the `config/fgmplus/` subfolder with a unified name: forge `config/fgmplus-common.toml` → `config/fgmplus/fgmplus.toml`, other targets `config/fgmplus.json` → `config/fgmplus/fgmplus.json`; the old file migrates automatically on first launch and is then removed, so slider-widening settings survive
+- The sound import folder `config/fgmplus/sounds/` is created at client startup (previously only by clicking "Sound Folder", leaving 1.21.x installs with nowhere to drop files manually)
+- The "Sound Folder" button on Windows now launches explorer.exe on the plain path: disassembly showed the vanilla helper routes directories through rundll32 FileProtocolHandler with a single-slash file:/ URL, which silently does nothing for directories; open failures now log at WARN
 
 ## v1.5.0
 

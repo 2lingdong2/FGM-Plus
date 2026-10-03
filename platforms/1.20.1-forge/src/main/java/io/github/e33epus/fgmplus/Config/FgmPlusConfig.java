@@ -1,9 +1,14 @@
 package io.github.e33epus.fgmplus.Config;
 
 
+import io.github.e33epus.fgmplus.FgmPlusMod;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.loading.FMLPaths;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class FgmPlusConfig
 {
@@ -43,7 +48,20 @@ public class FgmPlusConfig
 
     public static void setup()
     {
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SPEC, "fgmplus-common.toml");
+        //config lives at config/fgmplus/fgmplus.toml since 1.6.1 (was fgmplus-common.toml
+        //in the config root); carry the old file over so slider-widening settings survive
+        try {
+            Path configDir = FMLPaths.CONFIGDIR.get();
+            Path target = configDir.resolve(FgmPlusMod.MODID).resolve(FgmPlusMod.MODID + ".toml");
+            Files.createDirectories(target.getParent());
+            Path legacy = configDir.resolve("fgmplus-common.toml");
+            if (Files.isRegularFile(legacy) && !Files.exists(target)) {
+                Files.move(legacy, target);
+            }
+        } catch (Exception e) {
+            FgmPlusMod.LOGGER.warn("FGM Plus: could not migrate the old config file", e);
+        }
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SPEC, FgmPlusMod.MODID + "/" + FgmPlusMod.MODID + ".toml");
     }
 
 }
