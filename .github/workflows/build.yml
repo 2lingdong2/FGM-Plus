@@ -3,7 +3,7 @@ name: Build Mod
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # 这个选项允许你手动点击按钮触发构建
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,11 +18,8 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build with Gradle
-        run: ./gradlew build
+        run: cd platforms/1.21.11-fabric && chmod +x gradlew && ./gradlew build
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
